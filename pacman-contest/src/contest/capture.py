@@ -819,7 +819,7 @@ def read_command(argv):
                       help=default('How many episodes are training (suppresses output)'), default=0)
     parser.add_option('-c', '--catch-exceptions', dest='catch_exceptions', action='store_true', default=False,
                       help='Catch exceptions and enforce time limits')
-    parser.add_option('-g', '--game-id', dest='game_id', type='int', default=0,
+    parser.add_option('-m', '--match-id', dest='match_id', type='int', default=0,
                       help='Set the gameplay identifier')
     parser.add_option('-u', '--contest-name', dest='contest_name', type=str, default="default",
                       help="Set the contest name")
@@ -890,9 +890,9 @@ def read_command(argv):
         random.seed(parsed_options.set_random_seed)
 
     if parsed_options.record_log:
-        sub_folder = f'logs/contest_{parsed_options.contest_name}'
+        sub_folder = f'www/contest_{parsed_options.contest_name}/logs'
         os.makedirs(name=sub_folder, exist_ok=True)
-        sys.stdout = open(f'{sub_folder}/game_{parsed_options.game_id}.log', 'w')
+        sys.stdout = open(f'{sub_folder}/match_{parsed_options.match_id}.log', 'w')
         sys.stderr = sys.stdout
 
     # Choose a pacman agent
@@ -932,13 +932,16 @@ def read_command(argv):
     layouts = []
     for i in range(parsed_options.num_games):
         if parsed_options.layout == 'RANDOM':
-            layout_generated = layout.Layout(random_layout().split('\n'))
+            layout_name, layout_text = random_layout()
+            layout_generated = layout.Layout(layout_name=layout_name, layout_text=layout_text.split('\n'))
         elif parsed_options.layout.startswith('RANDOM'):
-            layout_generated = layout.Layout(random_layout(int(parsed_options.layout[6:])).split('\n'))
+            seed_chosen = int(parsed_options.layout[6:])
+            layout_name, layout_text = random_layout(seed=seed_chosen)
+            layout_generated = layout.Layout(layout_name=layout_name, layout_text=layout_text.split('\n'))
         elif parsed_options.layout.lower().find('capture') == -1:
             raise Exception('You must use a capture layout with capture.py')
         else:
-            layout_generated = layout.getLayout(parsed_options.layout)
+            layout_generated = layout.get_layout(parsed_options.layout)
         if layout_generated is None: raise Exception(f"The layout {parsed_options.layout} cannot be found")
 
         layouts.append(layout_generated)
@@ -950,7 +953,7 @@ def read_command(argv):
     args['record'] = parsed_options.record
     args['catch_exceptions'] = parsed_options.catch_exceptions
     args['delay_step'] = parsed_options.delay_step
-    args['game_id'] = parsed_options.game_id
+    args['match_id'] = parsed_options.match_id
     args['contest_name'] = parsed_options.contest_name
     return args
 
@@ -961,7 +964,7 @@ def random_layout(seed=None):
     # layout = 'layouts/random%08dCapture.lay' % seed
     # print 'Generating random layout in %s' % layout
     import contest.mazeGenerator as mazeGenerator
-    return mazeGenerator.generateMaze(seed)
+    return f'RANDOM{seed}', mazeGenerator.generateMaze(seed)
 
 
 def load_agents(is_red, agent_file, cmd_line_args):
@@ -1068,7 +1071,7 @@ def replay_game(layout, agents, actions, display, length, red_team_name, blue_te
 
 
 def run_games(layouts, agents, display, length, num_games, record, num_training, red_team_name, blue_team_name,
-              contest_name="default", mute_agents=False, catch_exceptions=False, delay_step=0, game_id=0):
+              contest_name="default", mute_agents=False, catch_exceptions=False, delay_step=0, match_id=0):
     rules = CaptureRules()
     games_list = []
 
@@ -1099,9 +1102,9 @@ def run_games(layouts, agents, display, length, num_games, record, num_training,
                           'length': length, 'red_team_name': red_team_name, 'blue_team_name': blue_team_name}
             print("recorded")
             g.record = pickle.dumps(components)
-            sub_folder = f'replays/contest_{contest_name}'
+            sub_folder = f'www/contest_{contest_name}/replays'
             os.makedirs(name=sub_folder, exist_ok=True)
-            with open(f'{sub_folder}/game_{game_id}.replay', 'wb') as f:
+            with open(f'{sub_folder}/match_{match_id}.replay', 'wb') as f:
                 f.write(g.record)
 
     if num_games > 1:
@@ -1116,27 +1119,94 @@ def run_games(layouts, agents, display, length, num_games, record, num_training,
     return games_list
 
 
-def save_score(game, contest_name, game_id=0):
-    sub_folder = f'scores/contest_{contest_name}'
+def get_games_data(games, red_name, blue_name, time_taken, match_id):
+    # (n1, n2, layout, score, winner, time_taken)
+    games_data = []
+    for game in games:
+        layout_name = game.state.data.layout.layout_name
+        score = game.state.data.score
+        if score > 0:
+            winner, score = red_name, score
+        elif score < 0:
+            winner, score = blue_name, -score
+        else:
+            winner, score = None, 0
+        games_data.append((red_name, blue_name, layout_name, score, winner, time_taken, match_id))
+    return games_data
+
+
+def compute_team_stats(games_data, team_name):
+    wins, draws, loses, score = 0, 0, 0, 0
+    for gd in games_data:  # gd[4] is the winner
+        if gd[4] is None:
+            draws += 1
+        elif gd[4] is team_name:
+            wins += 1
+            score += gd[3]  # gd[3] is the final score
+        else:
+            loses += 1
+    points = (wins * 3) + draws
+    return [
+        ((points * 100) / (3 * (wins + draws + loses))) if wins + draws + loses > 0 else 0,
+        points,
+        wins,
+        draws,
+        loses,
+        0,  # errors not counted
+        score,
+    ]
+
+
+def save_score(games, total_time, *, contest_name, match_id, **kwargs):
+    assert games
+    sub_folder = f'www/contest_{contest_name}/scores'
     os.makedirs(name=sub_folder, exist_ok=True)
-    with open(f'{sub_folder}/game_{game_id}.score', 'w') as f:
-        print(game.state.data.score, file=f)
+    games_data = get_games_data(games=games,
+                                red_name=kwargs['red_team_name'],
+                                blue_name=kwargs['blue_team_name'],
+                                time_taken=total_time,
+                                match_id=match_id)
+    teams_stats = {
+        kwargs['red_team_name']: compute_team_stats(games_data=games_data, team_name=kwargs['red_team_name']),
+        kwargs['blue_team_name']: compute_team_stats(games_data=games_data, team_name=kwargs['blue_team_name']),
+    }
+    match_data = {
+        'games': games_data,
+        'max_steps': games[0].length,
+        'teams_stats': teams_stats,
+        'layouts': [game.state.data.layout.layout_name for game in games],
+    }
+
+    import json
+    with open(f'{sub_folder}/match_{match_id}.json', 'w') as f:
+        # print(games.state.data.score, file=f)
+        f.write(json.dumps(match_data, sort_keys=True, indent=4))
 
 
-if __name__ == '__main__':
+def run(args):
     """
     The main function called when pacman.py is run from the command line:
     > python capture.py
-    
+
     See the usage string for more details.
     > python capture.py --help
     """
     start_time = time.time()
-    options = read_command(sys.argv[1:])  # Get game components based on input
-    print(options)
+    options = read_command(args)  # Get game components based on input
+    print(options, file=sys.stdout)
 
     games = run_games(**options)
+    total_time = round(time.time() - start_time, 0)
 
     if games:
-        save_score(game=games[0], contest_name=options['contest_name'], game_id=options['game_id'])
-    print('\nTotal Time Game: %s' % round(time.time() - start_time, 0))
+        # save_score(games=games, contest_name=options['contest_name'], match_id=options['match_id'])
+        save_score(games=games, total_time=total_time, **options)
+    print(f'\nTotal Time Game: {total_time}', file=sys.stdout)
+
+
+def main():
+    run(sys.argv[1:])
+
+
+if __name__ == '__main__':
+    main()
