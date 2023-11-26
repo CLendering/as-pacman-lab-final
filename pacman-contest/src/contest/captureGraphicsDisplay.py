@@ -15,6 +15,7 @@
 from contest.graphicsUtils import *
 import math, time
 from contest.game import Directions
+from contest.util import Counter
 
 ###########################
 #  GRAPHICS DISPLAY CODE  #
@@ -224,6 +225,8 @@ class PacmanGraphics:
         if blueName:
             self.blueName = blueName
 
+        self.particleImages = {0: [], 1: [], 2: [], 3: []}
+
     def initialize(self, state, isBlue=False):
         self.isBlue = isBlue
         self.startGraphics(state)
@@ -316,6 +319,41 @@ class PacmanGraphics:
         self.infoPane.updateScore(newState.score, newState.timeleft)
         if 'ghost_distances' in dir(newState):
             self.infoPane.updateghost_distances(newState.ghost_distances)
+
+        self.animateEnemyPositionParticleFilters()
+        pass
+
+    def animateEnemyPositionParticleFilters(self):
+        for particle_filter_dict in [self.redEnemyPositionParticleFilters, self.blueEnemyPositionParticleFilters]:
+            if particle_filter_dict is not None:
+                for enemy, particle_filter in particle_filter_dict.items():
+                    # delete old particles
+                    old_particle_images, self.particleImages[enemy] = self.particleImages[enemy][:], []
+                    for particle_image in old_particle_images:
+                        remove_from_screen(particle_image)
+
+                    # draw new particles
+                    particles = particle_filter.particles
+                    particle_counter = Counter()
+                    for pos in particles:
+                        particle_counter[tuple(pos)] += 1
+                    
+                    for pos, n in particle_counter.items():
+                        screen_pos = self.to_screen(pos)
+                        MIN_PARTICLE_SIZE = 0.05
+                        MAX_PARTICLE_SIZE = 1
+                        particle_size = MIN_PARTICLE_SIZE + (MAX_PARTICLE_SIZE - MIN_PARTICLE_SIZE) * ((n/particle_filter.num_particles) ** 1/2)
+                        scaled_particle_size = self.gridSize * particle_size
+                        particle_image = circle(screen_pos,
+                                 scaled_particle_size,
+                                 outlineColor='#ffffff', fillColor=GHOST_COLORS[enemy],
+                                 width=0.6 * scaled_particle_size,style='chord')
+                        self.particleImages[enemy].append(particle_image)
+                    refresh()
+
+
+
+
 
     def make_window(self, width, height):
         grid_width = (width - 1) * self.gridSize

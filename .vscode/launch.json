@@ -5,24 +5,43 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "Pacman Contest with Particle Filter Team",
             "type": "python",
             "request": "launch",
-            "program": "pacman-contest\\src\\contest\\capture.py",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
             "args": [
                 "-r",
-                "myTeam.py",
-                "-b",
-                "pacman-contest\\src\\contest\\baselineTeam.py",
-                "--layout",
-                "pacman-contest\\src\\contest\\layouts\\tinyCapture",
-            ],
+                "agents/team_with_filter/particleFilterTeam",
+            ]
+        },
+        {
+            "name": "[quiet] Pacman Contest with Particle Filter Team",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
             "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"},
-            // Anaconda myenv environment
-            "python": "C:\\Users\\berna\\anaconda3\\envs\\pacman-contest\\python.exe"
-        }
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+                "-r",
+                "agents/team_with_filter/particleFilterTeam",
+                "-q"
+            ]
+        },
+        {
+            "name": "Keyboard Agent",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+                "--keys0",
+            ]
+        },
     ]
 }

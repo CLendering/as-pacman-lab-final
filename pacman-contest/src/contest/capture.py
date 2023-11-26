@@ -259,6 +259,15 @@ class GameState:
         distances = [compute_noisy_distance(pos, state.get_agent_position(i)) for i in range(n)]
         state.agent_distances = distances
 
+        # TODO delete this - it's just for evaluating the kalman filter.
+        red = state.is_on_red_team(index)
+        enemies = state.get_blue_team_indices() if red else state.get_red_team_indices()
+        DEBUG_actual_enemy_positions = [state.get_agent_position(enemy) for enemy in enemies]
+        DEBUG_actual_enemy_distances = [manhattanDistance(pos, enemy_pos) for enemy_pos in DEBUG_actual_enemy_positions]
+        state.DEBUG_actual_enemy_positions = DEBUG_actual_enemy_positions
+        state.DEBUG_actual_enemy_distances = DEBUG_actual_enemy_distances
+        ######
+
         # Remove states of distant opponents
         if index in self.blue_team:
             team = self.blue_team
@@ -902,11 +911,15 @@ def read_command(argv):
         blue_args['num_training'] = parsed_options.num_training
     # no_keyboard = parsed_options.textgraphics or parsed_options.quiet or parsed_options.num_training > 0
     print(f'\nRed team {parsed_options.red} with {red_args}:')
-    red_agents = load_agents(True, parsed_options.red, red_args)
+    red_agents, redEnemyPositionParticleFilters = load_agents(True, parsed_options.red, red_args)
     print(f'\nBlue team {parsed_options.blue} with {blue_args}:')
-    blue_agents = load_agents(False, parsed_options.blue, blue_args)
+    blue_agents, blueEnemyPositionParticleFilters = load_agents(False, parsed_options.blue, blue_args)
     args['agents'] = sum([list(el) for el in zip(red_agents, blue_agents)], [])  # list of agents
 
+    args['display'].redEnemyPositionParticleFilters = redEnemyPositionParticleFilters
+    args['display'].blueEnemyPositionParticleFilters = blueEnemyPositionParticleFilters
+
+    print(f'{red_agents=} {blue_agents=}')
     if None in blue_agents or None in red_agents:
         if None in blue_agents:
             print('\nBlue team failed to load!\n')
@@ -1004,6 +1017,12 @@ def load_agents(is_red, agent_file, cmd_line_args):
     # if textgraphics and factoryClassName.startswith('Keyboard'):
     #   raise Exception('Using the keyboard requires graphics (no text display, quiet or training games)')
 
+    enemyPositionParticleFilters = None
+    try:
+        enemyPositionParticleFilters = getattr(module, 'enemyPositionParticleFilters')
+    except AttributeError:
+        print(f"{'red' if is_red else 'blue'} team doesn't have enemyPositionParticleFilters")
+
     try:
         create_team_func = getattr(module, 'create_team')
     except AttributeError:
@@ -1015,7 +1034,7 @@ def load_agents(is_red, agent_file, cmd_line_args):
     if not is_red:
         index_addend = 1
     indices = [2 * i + index_addend for i in range(2)]
-    return create_team_func(indices[0], indices[1], is_red, **args)
+    return create_team_func(indices[0], indices[1], is_red, **args), enemyPositionParticleFilters
 
 
 def replay_game(layout, agents, actions, display, length, red_team_name, blue_team_name, wait_end=True, delay=1):
