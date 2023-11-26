@@ -260,58 +260,6 @@ class EnemyPositionParticleFilter:
     #     return np.array(probable_random_particles)
 
 
-### Kalman Filter
-class KalmanFilter:
-    def __init__(self, initial_state, initial_covariance, measurement_noise):
-        """
-        Initialize the Kalman filter.
-
-        :param initial_state: Initial estimate of the state.
-        :param initial_covariance: Initial estimate of the error covariance.
-        :param measurement_noise: Variance of the measurement noise.
-        """
-        self.state_estimate = initial_state
-        self.error_covariance = initial_covariance
-        self.measurement_noise = measurement_noise
-        self.measurement_matrix = np.eye(len(initial_state))  # Assuming the same dimensions for state and measurements
-
-    def predict(self, process_noise):
-        """
-        Predict step of the Kalman filter.
-
-        :param process_noise: The noise covariance to add for prediction uncertainty.
-        """
-        # Predict the state estimate (assuming it remains constant in this case)
-        # state_estimate = state_estimate (no change)
-
-        # Predict the error covariance
-        self.error_covariance += process_noise
-
-    def update(self, measurement):
-        """
-        Update step of the Kalman filter.
-
-        :param measurement: The new measurement to update the state.
-        """
-        # Compute Kalman Gain
-        kalman_gain = self.error_covariance.dot(self.measurement_matrix.T).dot(
-            np.linalg.inv(self.measurement_matrix.dot(self.error_covariance).dot(self.measurement_matrix.T) + self.measurement_noise))
-
-        # Update the state estimate
-        self.state_estimate += kalman_gain.dot(measurement - self.measurement_matrix.dot(self.state_estimate))
-
-        # Update the error covariance
-        identity_matrix = np.eye(len(self.state_estimate))
-        self.error_covariance = (identity_matrix - kalman_gain.dot(self.measurement_matrix)).dot(self.error_covariance)
-
-    def get_estimated_state(self):
-        """
-        Get the current estimated state.
-        """
-        return self.state_estimate
-
-
-
 #################
 # Team creation #
 #################
@@ -363,18 +311,6 @@ class ReflexCaptureAgent(CaptureAgent):
         self.start = None
     
 
-        #self.mses_noisy_f = open('kalman_filter/mse_noisy.log', 'w')
-        #self.mses_kf_f = open('kalman_filter/mse_kf.log', 'w')
-        self.kf_estimated_distances_f = open(f'kalman_filter/estimated_distances_agent_{index}.log', 'w')
-        self.kf_true_distances_f = open(f'kalman_filter/true_distances_agent_{index}.log', 'w')
-        self.kf_noisy_distances_f = open(f'kalman_filter/noisy_distances_agent_{index}.log', 'w')
-
-        self.move_number = 0
-
-        self.history_kf_estimated_distances = []
-        self.history_kf_true_distances = []     
-        self.history_kf_noisy_distances = [] 
-
     def __del__(self):
         if self.index == max(self.agentsOnTeam):
             s_pf_estimated_positions_f = ''
@@ -395,21 +331,6 @@ class ReflexCaptureAgent(CaptureAgent):
             true_distances_f.write(s_true_distances_f)
             noisy_distances_f.write(s_noisy_distances_f)
 
-        s_kf_estimated_distances = ''
-        s_kf_noisy_distances = ''
-        s_kf_true_distances = ''
-        for i in range(self.move_number):
-            e = self.history_kf_estimated_distances[i]
-            n = self.history_kf_noisy_distances[i]
-            t = self.history_kf_true_distances[i]
-            s_kf_estimated_distances += f'{e[0]} {e[1]}\n'
-            s_kf_noisy_distances += f'{n[0]} {n[1]}\n'
-            s_kf_true_distances += f'{t[0]} {t[1]}\n'
-        self.kf_estimated_distances_f.write(s_kf_estimated_distances)
-        self.kf_noisy_distances_f.write(s_kf_noisy_distances)
-        self.kf_true_distances_f.write(s_kf_true_distances)
-
-
 
         pf_estimated_positions_f.close()
         pf_estimated_distances_f.close()
@@ -417,11 +338,6 @@ class ReflexCaptureAgent(CaptureAgent):
         true_distances_f.close()
         noisy_distances_f.close()
 
-        #self.mses_noisy_f.close()
-        #self.mses_kf_f.close()
-        self.kf_estimated_distances_f.close()
-        self.kf_noisy_distances_f.close()
-        self.kf_true_distances_f.close()
 
 
     def register_initial_state(self, game_state):
@@ -436,41 +352,7 @@ class ReflexCaptureAgent(CaptureAgent):
                                                walls=game_state.get_walls(), 
                                                initial_position=game_state.get_agent_position(enemy)) 
         self.finishedFirstMove = False
-                                        
-        # register_initial_state is called once at the very beginning of a game
-        # here we can get the enemies exact initial starting position
-        # and use this information to initialize the kalman filter for estimating the enemy distances
-        enemy_positions = [game_state.get_agent_position(enemy) for enemy in self.get_opponents(game_state)]
-        agent_position = game_state.get_agent_position(self.index)
-        enemy_distances = [manhattanDistance(agent_position, enemy_position) for enemy_position in enemy_positions]
-        initial_covariance = np.eye(len(enemy_distances)) * 0.1 # smaller value due to high certainty of initial enemy positions
-        SONAR_NOISE_RANGE = 13 # from capture.py: noise is from [-6, 6]
-        # https://proofwiki.org/wiki/Variance_of_Discrete_Uniform_Distribution
-        # can use formula thanks to shift-invariance https://math.stackexchange.com/a/456866
-        enemy_distances_variance = (SONAR_NOISE_RANGE**2 - 1) / 12
         
-        kalman_filter =  kf.KalmanFilter (dim_x=2, dim_z=2)
-        # assign initial state of enemy distances
-        kalman_filter.x = enemy_distances
-        # initial state is known exactly -> covariance matrix of that state is 0
-        kalman_filter.P *= 0
-        # define the state transition matrix (for now, assume that distance in the next step is the same as in the previous step)
-        kalman_filter.F = np.eye(len(enemy_distances))
-        # measurement function
-        kalman_filter.H = np.eye(len(enemy_distances))
-        # measurement noise
-        self.noisy_measurement_noise = np.eye(len(enemy_distances)) * enemy_distances_variance
-        kalman_filter.R = self.noisy_measurement_noise
-        # process noise
-        var = (5**2 - 1) / 12 # distance can change at most +-2 -> variance of discrete uniform distribution [-2, 2] == var of [1, 5] (shift invariance)
-        kalman_filter.Q = np.eye(len(enemy_distances)) * var
-
-
-        self.enemy_distances_kalman_filter = kalman_filter
-
-        #self.enemy_distances_kalman_filter = KalmanFilter(enemy_distances, initial_covariance, enemy_distances_variance)
-
-
     def get_exact_opponent_distances(self, game_state): 
         agent_pos = game_state.get_agent_position(self.index)
         enemy_positions = [game_state.get_agent_position(i) for i in self.get_opponents(game_state)]
@@ -481,44 +363,18 @@ class ReflexCaptureAgent(CaptureAgent):
         distances = game_state.get_agent_distances()
         return [distances[i] for i in self.get_opponents(game_state)]
 
-    def update_enemy_distances_kalman_filter(self, game_state):
-        # Get noisy measurements as a fallback
-        new_measurements_noisy = np.array(self.get_noisy_opponent_distances(game_state))
-        # Attempt to get exact measurements
-        new_measurements_exact = self.get_exact_opponent_distances(game_state)
-
-        # Prepare an array to store the final measurements for the update
-        final_measurements = new_measurements_noisy.copy()
-
-        # Iterate over the measurements to check for exact values
-        for i, exact_measurement in enumerate(new_measurements_exact):
-            if exact_measurement is not None:
-                # If an exact measurement is available, use it and adjust R for that measurement
-                final_measurements[i] = exact_measurement
-                # Set a lower R value (indicating higher confidence) for this measurement
-                self.enemy_distances_kalman_filter.R[i, i] = 0 # Set an appropriate lower value
-            else:
-                # If no exact measurement, use the noisy measurement and the default R value
-                self.enemy_distances_kalman_filter.R[i, i] = self.noisy_measurement_noise[i, i]
-
-        # Perform the predict and update steps
-        self.enemy_distances_kalman_filter.predict()
-        self.enemy_distances_kalman_filter.update(final_measurements)
-
-        return self.enemy_distances_kalman_filter.x
-
 
     def choose_action(self, game_state):
         """
         Picks among the actions with the highest Q(s,a).
         """
-        self.move_number += 1
+        print(f"Agent {self.index}'s turn")
 
         PRINT = False
         actions = game_state.get_legal_actions(self.index)
         if PRINT: print(f"I'm agent {self.index}")
         noisy_distances = self.get_noisy_opponent_distances(game_state)
-        # make the comparison fair - kalman filter also gets exact distances when possible
+        # make the comparison fair - filter also gets exact distances when possible
         exact_distances = self.get_exact_opponent_distances(game_state)
         for i, d in enumerate(exact_distances):
             if d is not None:
@@ -559,7 +415,7 @@ class ReflexCaptureAgent(CaptureAgent):
         # z.b. in der aktuellen datei bei row 100 schwingen die werte zu sehr rum das geht gar nich
         # die estimated und noisy schwingen auch extrem ka was da los is
 
-        # just for evaluating the kalman filter: get the actual positions of the enemies
+        # just for evaluating the filter: get the actual positions of the enemies
         DEBUG_actual_enemy_distances = game_state.DEBUG_actual_enemy_distances
 
 
@@ -571,27 +427,12 @@ class ReflexCaptureAgent(CaptureAgent):
         history_DEBUG_actual_enemy_distances.append(DEBUG_actual_enemy_distances)
         history_noisy_distances.append(noisy_distances)
 
-        kf_estimated_distances = self.update_enemy_distances_kalman_filter(game_state)
-        rounded_estimated_distances = [round(d) for d in kf_estimated_distances]
-        self.history_kf_noisy_distances.append(noisy_distances)
-        self.history_kf_true_distances.append(DEBUG_actual_enemy_distances)
-        self.history_kf_estimated_distances.append(kf_estimated_distances)
-
         if PRINT: print(f'{noisy_distances=}')
-        if PRINT: print(f'kalman_filter_distances={rounded_estimated_distances} ({kf_estimated_distances})')
         if PRINT: print(f'true_distances={DEBUG_actual_enemy_distances}')
 
         error_noisy_distances = np.array(DEBUG_actual_enemy_distances) - np.array(noisy_distances)
         MSE_noisy_distances = (error_noisy_distances**2).mean()
         if PRINT: print(f'{MSE_noisy_distances=}')
-        error_kalman_filter_distances = np.array(DEBUG_actual_enemy_distances) - np.array(rounded_estimated_distances)
-        MSE_kalman_filter_distances = (error_kalman_filter_distances**2).mean()
-        if PRINT: print(f'{MSE_kalman_filter_distances=}')
-
-        #if self.move_number == 300:
-        #    self.mses_noisy_f.write(f'{MSE_noisy_distances}\n')
-        #    self.mses_kf_f.write(f'{MSE_kalman_filter_distances}\n')
-
 
 
         # You can profile your evaluation time by uncommenting these lines
