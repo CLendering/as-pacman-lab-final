@@ -20,6 +20,7 @@
 # John DeNero (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
 # For more info, see http://inst.eecs.berkeley.edu/~cs188/sp09/pacman.html
 
+from abc import abstractmethod
 import random
 import contest.util as util
 
@@ -27,6 +28,29 @@ from contest.captureAgents import CaptureAgent
 from contest.game import Directions
 from contest.util import nearestPoint
 from queue import PriorityQueue
+from contest.game import Directions, Configuration, Actions
+from contest.capture import AgentRules
+
+#################
+# Utility #
+#################
+def get_theoretical_legal_successors(position, game_state):
+        """
+        Returns the legal actions for an agent
+        """
+        dummy_config = Configuration(position, 'North')
+        possible_actions = Actions.get_possible_actions(dummy_config, game_state.get_walls())
+
+        # Update Configuration
+        speed = 1.0
+
+        possible_successors = []
+        for action in possible_actions:
+            vector = Actions.direction_to_vector(action, speed)
+            successor = dummy_config.generate_successor(vector)
+            possible_successors.append(successor.pos)
+
+        return possible_successors, possible_actions
 
 
 #################
@@ -34,7 +58,7 @@ from queue import PriorityQueue
 #################
 
 def create_team(first_index, second_index, is_red,
-                first='BetterReflexAgent', second='DefensiveReflexAgent', num_training=0):
+                first='OffensiveAStarAgent', second='DefensiveReflexAgent', num_training=0):
     """
     This function should return a list of two agents that will form the
     team, initialized using firstIndex and secondIndex as their agent
@@ -136,214 +160,207 @@ class ReflexCaptureAgent(CaptureAgent):
         """
         return {'successor_score': 1.0}
     
-    
-class BetterReflexAgent(CaptureAgent):
 
-    def __init__(self, index, time_for_computing=.1):
+def get_actions(goal_state, parents):
+    """
+    Retrieves the sequence of actions taken to reach the given goal state.
+    
+    Parameters:
+    - goal_state: The goal state.
+    - parents: A dictionary mapping a state to its parent state and the action taken to reach it.
+
+    Returns:
+    - A list of actions leading to the goal state.
+    """
+
+    # Initialize the list of actions
+    actions_list = []
+    
+    # Start with the goal state
+    cur_state = goal_state
+
+    # Trace back the actions taken to reach the goal state
+    while True:
+        # Break the loop if the current state is not in the parents dictionary
+        if cur_state not in parents:
+            break
+        # Otherwise, update the current state and append the action taken to reach it
+        cur_state, act = parents[cur_state]
+        actions_list.append(act)
+
+    # Reverse the action list to get the correct order from start to goal
+    actions_list.reverse()
+    return actions_list 
+
+# dijkstra's algorithm
+def dik(agent_pos, goal, game_state=None):
+    return 0
+    
+def aStarSearch(agent, goal, game_state, heuristic=dik):
+    """Search the node that has the lowest combined cost and heuristic first."""
+
+    # Dictionary to store each state's parent state and the action taken to reach it
+    parents = {}
+
+    # Set to keep track of visited states
+    vis = set()
+
+    # Dictionary to keep track of the nodes that are currently in the priority queue
+    # and their associated costs (actual path cost and estimated total cost)
+    in_queue = {}
+    
+    # Create a priority queue to manage states based on their estimated total cost
+    q = util.PriorityQueue()
+    
+    # Get the starting state
+    agent_pos = game_state.get_agent_position(agent.index)
+
+    # Calculate the heuristic value for the starting state
+    heuristic_val = heuristic(agent_pos, goal, game_state)
+
+    # Push the starting state into the queue with its heuristic value and mark it as visited
+    q.push(agent_pos, heuristic_val)
+    vis.add(agent_pos)
+
+    in_queue[agent_pos] = (0, heuristic_val)
+    
+    # Iterate over the queue until it is empty
+    while not q.isEmpty():
+        # Pop the state with the least estimated total cost from the priority queue
+        cur_pos = q.pop()
+        cur_path_cost, _ = in_queue.pop(cur_pos) # Retrieve and remove the current path cost from the in_queue dictionary
+        
+        # If this state is the goal state, set it as goal_state and break from the loop
+        if goal == cur_pos:
+            goal_state = cur_pos
+            break
+        
+        
+        legal_successors, legal_actions = get_theoretical_legal_successors(cur_pos, game_state)
+         
+        successors = []
+        for successor, action in zip(legal_successors, legal_actions):
+            successors.append((successor, action, 1))
+                    
+        # Iterate through the successors of the current state
+        for pos, action, cost in successors:
+            # Calculate the total path cost to reach the successor
+            path_cost = cur_path_cost + cost
+
+            # Calculate the estimated total cost for the successor (path cost + heuristic)
+            total_cost = path_cost + heuristic(pos, goal, game_state)
+
+            # If the successor is already in the priority queue and has a higher estimated total cost
+            if pos in in_queue:
+                if total_cost < in_queue[pos][1]:
+                    # Update the estimated total cost in the priority queue and update the parent and action leading to the successor
+                    q.update(pos, total_cost)
+                    parents[pos] = (cur_pos, action)
+            elif pos not in vis:
+                # Mark the successor as visited
+                vis.add(pos)
+
+                # Store the successor's path cost and estimated total cost in the in_queue dictionary
+                in_queue[pos] = (path_cost, total_cost)
+
+                # Push the successor into the priority queue with its estimated total cost
+                q.push(pos, total_cost)
+
+                # Store the current state and action leading to the successor in the parents dictionary
+                parents[pos] = (cur_pos, action)
+
+    # Return the sequence of actions leading to the goal state
+    return get_actions(goal_state, parents)
+
+# Implements a FSM whose plan is determined by the game state \ heuristic space of the game state
+# Abstract Class
+class GoalPlanner:
+    
+    @staticmethod
+    @abstractmethod
+    def compute_goal(agent, game_state, current_plan, goal):
+        pass
+
+
+class GoalPlannerOffensive(GoalPlanner):
+    @staticmethod
+    def compute_goal(agent, game_state):
+        
+        # get the current position of the agent
+        agent_pos = game_state.get_agent_position(agent.index)
+        
+        # get the food list
+        if agent.red:
+            food_list = game_state.get_blue_food().as_list()
+        else:
+            food_list = game_state.get_red_food().as_list()
+
+        food_manhattan_distances_dict = {
+            
+        }
+   
+        for food_pos in food_list:
+            food_manhattan_distances_dict[food_pos] = abs(food_pos[0] - agent_pos[0]) + abs(food_pos[1] - agent_pos[1])
+        
+        # sort the food list based on the manhattan distance
+        food_manhattan_distances_dict_sorted = dict(sorted(food_manhattan_distances_dict.items(), key=lambda item: item[1]))
+        
+        
+        # get the closest food position
+        new_goal = list(food_manhattan_distances_dict_sorted.keys())[0]
+        
+        # if the goal is the same as the previous goal, then we don't need to recompute the plan
+        if new_goal == agent.goal:
+            return agent.goal
+        else:
+            return new_goal
+        
+        
+
+# Updates the goal post dynamically based on the game state
+
+class OffensiveAStarAgent(CaptureAgent):
+    def __init__(self, index, time_for_computing=.1, action_planner=GoalPlannerOffensive):
         super().__init__(index, time_for_computing)
         self.start = None
+        self.goal = None
+        self.plan = None
+        self.action_planner = action_planner
 
     def register_initial_state(self, game_state):
         self.start = game_state.get_agent_position(self.index)
+        self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
+        self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
         CaptureAgent.register_initial_state(self, game_state)
-    
+        
+    # Implements A* and executes the plan
     def choose_action(self, game_state):
-        legal_actions = game_state.get_legal_actions(self.index)
-
-        # Use A* algorithm to find the best action
-        best_action = self.astar_search(game_state)
-
-        return best_action
-    
-
-    def get_actions(goal_state, parents):
-        """
-        Retrieves the sequence of actions taken to reach the given goal state.
-        
-        Parameters:
-        - goal_state: The goal state.
-        - parents: A dictionary mapping a state to its parent state and the action taken to reach it.
-
-        Returns:
-        - A list of actions leading to the goal state.
-        """
-
-        # Initialize the list of actions
-        actions_list = []
-        
-        # Start with the goal state
-        cur_state = goal_state
-
-        # Trace back the actions taken to reach the goal state
-        while True:
-            # Break the loop if the current state is not in the parents dictionary
-            if cur_state not in parents:
-                break
-            # Otherwise, update the current state and append the action taken to reach it
-            cur_state, act = parents[cur_state]
-            actions_list.append(act)
-
-        # Reverse the action list to get the correct order from start to goal
-        actions_list.reverse()
-        return actions_list
-
-    def evaluate(self, game_state, action):
-    
-        # Useful information you can extract from a GameState (pacman.py)
-        successorGameState = game_state.generate_successor(agent_index=self.index, action=action)
-
-        if self.red:
-            newFood = successorGameState.get_red_food()
-            team_indexes = successorGameState.red_team
-            enemy_indexes = successorGameState.blue_team
-        else:
-            newFood = successorGameState.get_blue_food()
-            team_indexes = successorGameState.blue_team
-            enemy_indexes = successorGameState.red_team
-
-        newPos = successorGameState.get_agent_position(index=self.index)
-        
-        newGhostStates = []
-        for enemy_index in enemy_indexes:
-            enemy_state = successorGameState.get_agent_state(index=enemy_index)
-            if enemy_state.configuration is not None:
-                if not enemy_state.is_pacman:
-                    newGhostStates.append(enemy_state)
-
-        newScaredTimes = [ghostState.scared_timer for ghostState in newGhostStates]
-
-        new_agent_state = successorGameState.get_agent_state(index=self.index)
-        previous_agent_state = game_state.get_agent_state(index=self.index)
-
-
-
-        
-        # Our approach was to compute a score based on the distance to the closest food, the number of remaining foods, 
-        # the distance to ghosts, and the remaining scared timer for the ghosts, using weights that were determined by trial and error.
-
-        # We found that the weights that worked best were:
-        # -5 for the number of remaining foods
-        # -8 for the distance to the closest food
-        # 7 for the distance to ghosts
-        # 1 for the remaining scared timer for the ghosts
-
-        # And the final score was computed as:
-        # closest_food_dist_weight * closest_food_dist + \
-        # food_count_weight * food_count + \
-        # ghost_manhattan_distance_weight * ghost_manhattan_distance + \
-        # ghost_scared_timer_weight * ghost_scared_timer
-
-        # Calculate the previous food count before the action
-        # Calculate the previous food count before the action
-        new_food_count = new_agent_state.num_carrying
-        prev_food_count = previous_agent_state.num_carrying
-
-      
-        # Calculate the Manhattan distance from Pacman to each remaining food pellet
-        food_manhattan_distances = []
-        for food_pos in newFood.as_list():
-            food_manhattan_distances.append(abs(food_pos[0] - newPos[0]) + abs(food_pos[1] - newPos[1]))
-
-        
-        # Define weights for the distance to the closest food and calculate the distance to the closest food, by
-        # taking the minimum of the Manhattan distances to each remaining food pellet
-        closest_food_dist_weight = -8
-        closest_food_dist = min(food_manhattan_distances)
-        
-        # If Pacman has eaten a food pellet in the proposed action, set the closest food distance weight to 0 so it doesn't affect the score
-        if prev_food_count != new_food_count:
-            closest_food_dist_weight = 0
-        
-        # Set the ghost manhattan distance weight
-        ghost_manhattan_distance_weight = 7
-
-        # Calculate the Manhattan distance from Pacman to each ghost
-        ghost_manhattan_distance = 0
-        for ghost_state in newGhostStates:
-            ghost_pos = ghost_state.get_position()
-            dist = abs(ghost_pos[0] - newPos[0]) + abs(ghost_pos[1] - newPos[1])
-            # If a ghost is on Pacman's position on the proposed action, set a very negative value (-infinity) so Pacman avoids it
-            if dist == 0:
-                ghost_manhattan_distance = -float('inf')
-                break
-            ghost_manhattan_distance += dist
-        
-        # If a ghost is on Pacman's position, return the -infinity score immediately - Pacman should avoid this action
-        if ghost_manhattan_distance == -float('inf'):
-            return ghost_manhattan_distance
-        
-        # If Pacman has finished eating all food pellets in the proposed action, set an infinite reward so Pacman will take this
-        # action and win the game
-        if closest_food_dist == float('inf'):
-            return float('inf')
-        
-        # Define weights for the remaining scared timer for the ghosts and calculate the remaining scared timer for the ghosts
-        # as the sum of the scared timers for each ghost
-        ghost_scared_timer_weight = 1
-        ghost_scared_timer = sum(newScaredTimes)
-        
-        # Return the final score as the weighted sum of the closest food distance, the number of remaining foods, the ghost Manhattan distance,
-        # and the remaining scared timer for the ghosts
-        return closest_food_dist_weight * closest_food_dist + \
-               ghost_manhattan_distance_weight * ghost_manhattan_distance + \
-               ghost_scared_timer_weight * ghost_scared_timer
-
-    def choose_action(self, game_state):
-        """Search the node that has the lowest combined cost and heuristic first."""
+        print(game_state)
 
         actions = game_state.get_legal_actions(self.index)
         
-        # You can profile your evaluation time by uncommenting these lines
-        # start = time.time()
-        values = [self.evaluate(game_state, a) for a in actions]
-        # print 'eval time for agent %d: %.4f' % (self.index, time.time() - start)
+        if len(self.plan) <= 0:
+            self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
+            self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
 
-        max_value = min(values)
-        best_actions = [a for a, v in zip(actions, values) if v == max_value]
+        if len(self.plan) > 0:
+            next_action = self.plan.pop(0)
+            if next_action in actions:
+                return next_action
+            else:
+                self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
+                self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
 
-        food_left = len(self.get_food(game_state).as_list())
-
-        if food_left <= 2:
-            best_dist = 9999
-            best_action = None
-            for action in actions:
-                successor = self.get_successor(game_state, action)
-                pos2 = successor.get_agent_position(self.index)
-                dist = self.get_maze_distance(self.start, pos2)
-                if dist < best_dist:
-                    best_action = action
-                    best_dist = dist
-            return best_action
-
-        return random.choice(best_actions)
-    
-    def get_successor(self, game_state, action):
-        """
-        Finds the next successor which is a grid position (location tuple).
-        """
-        successor = game_state.generate_successor(self.index, action)
-        pos = successor.get_agent_state(self.index).get_position()
-        if pos != nearestPoint(pos):
-            # Only half a grid position was covered
-            return successor.generate_successor(self.index, action)
+            new_next_action = self.plan.pop(0)
+            if new_next_action in actions:
+                return new_next_action
+            else:
+                return random.choice(actions)
         else:
-            return successor
+            return random.choice(actions)
+        
 
-    def get_features(self, game_state, action):
-        """
-        Returns a counter of features for the state
-        """
-        features = util.Counter()
-        successor = self.get_successor(game_state, action)
-        features['successor_score'] = self.get_score(successor)
-        return features
-
-    def get_weights(self, game_state, action):
-        """
-        Normally, weights do not depend on the game state.  They can be either
-        a counter or a dictionary.
-        """
-        return {'successor_score': 1.0}
+# Based on the goal, finds the optimal path and executes it
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """
