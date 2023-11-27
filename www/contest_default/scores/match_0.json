@@ -4,9 +4,9 @@
             "Red",
             "Blue",
             "pacman-contest\\src\\contest\\layouts\\defaultCapture.lay",
-            16,
-            "Red",
-            81.0,
+            2,
+            "Blue",
+            93.0,
             0
         ]
     ],
@@ -16,6 +16,15 @@
     "max_steps": 1200,
     "teams_stats": {
         "Blue": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            2
+        ],
+        "Red": [
             0.0,
             0,
             0,
@@ -23,15 +32,6 @@
             1,
             0,
             0
-        ],
-        "Red": [
-            100.0,
-            3,
-            1,
-            0,
-            0,
-            0,
-            16
         ]
     }
 }
