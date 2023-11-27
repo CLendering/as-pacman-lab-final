@@ -3,35 +3,35 @@
         [
             "Red",
             "Blue",
-            "pacman-contest\\src\\contest\\layouts\\tinyCapture.lay",
-            0,
-            null,
-            56.0,
+            "pacman-contest\\src\\contest\\layouts\\defaultCapture.lay",
+            16,
+            "Red",
+            81.0,
             0
         ]
     ],
     "layouts": [
-        "pacman-contest\\src\\contest\\layouts\\tinyCapture.lay"
+        "pacman-contest\\src\\contest\\layouts\\defaultCapture.lay"
     ],
     "max_steps": 1200,
     "teams_stats": {
         "Blue": [
-            33.333333333333336,
-            1,
+            0.0,
+            0,
+            0,
             0,
             1,
-            0,
             0,
             0
         ],
         "Red": [
-            33.333333333333336,
+            100.0,
+            3,
             1,
             0,
-            1,
             0,
             0,
-            0
+            16
         ]
     }
 }

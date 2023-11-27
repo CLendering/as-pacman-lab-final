@@ -21,8 +21,10 @@
 # For more info, see http://inst.eecs.berkeley.edu/~cs188/sp09/pacman.html
 
 from abc import abstractmethod
+from collections import deque
 import random
 import contest.util as util
+import time
 
 from contest.captureAgents import CaptureAgent
 from contest.game import Directions
@@ -52,6 +54,45 @@ def get_theoretical_legal_successors(position, game_state):
 
         return possible_successors, possible_actions
 
+def bfs_until_non_wall(start, game_state):
+    """
+    Perform a breadth-first search until a non-wall position is found.
+
+    :param start: Tuple (x, y) representing the start coordinate.
+    :return: List of tuples representing the path to the first non-wall position.
+    """
+    # Define movements: right, left, up, down
+    movements = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+    # Queue for BFS, initialized with the start position
+    queue = deque([start])
+
+    # Dictionary to keep track of visited nodes and their parents
+    visited = {start: None}
+
+    # Breadth-First Search
+    while queue:
+        current = queue.popleft()
+
+        # Stop if the current position is not a wall
+        if not game_state.has_wall(current[0], current[1]):
+            path = []
+            while current:
+                path.append(current)
+                current = visited[current]
+            return path[::-1]  # Return reversed path
+
+        # Check each neighbor
+        for dx, dy in movements:
+            neighbor = (current[0] + dx, current[1] + dy)
+            
+            # If the neighbor is not visited, add it to the queue and mark as visited
+            if neighbor not in visited:
+                queue.append(neighbor)
+                visited[neighbor] = current
+
+    # If a non-wall position is not reachable
+    return None
 
 #################
 # Team creation #
@@ -193,10 +234,10 @@ def get_actions(goal_state, parents):
     return actions_list 
 
 # dijkstra's algorithm
-def dik(agent_pos, goal, game_state=None):
+def dijk(agent, goal, game_state=None):
     return 0
     
-def aStarSearch(agent, goal, game_state, heuristic=dik):
+def aStarSearch(agent, goal, game_state, heuristic=dijk):
     """Search the node that has the lowest combined cost and heuristic first."""
 
     # Dictionary to store each state's parent state and the action taken to reach it
@@ -216,7 +257,7 @@ def aStarSearch(agent, goal, game_state, heuristic=dik):
     agent_pos = game_state.get_agent_position(agent.index)
 
     # Calculate the heuristic value for the starting state
-    heuristic_val = heuristic(agent_pos, goal, game_state)
+    heuristic_val = heuristic(agent, goal, game_state)
 
     # Push the starting state into the queue with its heuristic value and mark it as visited
     q.push(agent_pos, heuristic_val)
@@ -248,7 +289,7 @@ def aStarSearch(agent, goal, game_state, heuristic=dik):
             path_cost = cur_path_cost + cost
 
             # Calculate the estimated total cost for the successor (path cost + heuristic)
-            total_cost = path_cost + heuristic(pos, goal, game_state)
+            total_cost = path_cost + heuristic(agent, goal, game_state)
 
             # If the successor is already in the priority queue and has a higher estimated total cost
             if pos in in_queue:
@@ -268,7 +309,7 @@ def aStarSearch(agent, goal, game_state, heuristic=dik):
 
                 # Store the current state and action leading to the successor in the parents dictionary
                 parents[pos] = (cur_pos, action)
-
+    
     # Return the sequence of actions leading to the goal state
     return get_actions(goal_state, parents)
 
@@ -283,11 +324,68 @@ class GoalPlanner:
 
 
 class GoalPlannerOffensive(GoalPlanner):
+    
+    MAX_SAFE_DISTANCE = 8
+    BUFFER_ZONE_FROM_CENTER = 4
+
     @staticmethod
     def compute_goal(agent, game_state):
         
+        # Get the center of our side position in x, y coordinates
+        if agent.red:
+            center_of_our_side = (int(game_state.data.layout.width / 4), int(game_state.data.layout.height / 4))
+            if game_state.has_wall(center_of_our_side[0], center_of_our_side[1]):
+                center_of_our_side = bfs_until_non_wall(center_of_our_side, game_state)[-1]
+        else:
+            center_of_our_side = (int(3 * game_state.data.layout.width / 4), int(3 * game_state.data.layout.height / 4))
+            if game_state.has_wall(center_of_our_side[0], center_of_our_side[1]):
+                center_of_our_side = bfs_until_non_wall(center_of_our_side, game_state)[-1]
+
         # get the current position of the agent
         agent_pos = game_state.get_agent_position(agent.index)
+        
+
+        # Calculate the distance from the agent to the center vertical line (x distance)
+        center_of_board = (int(game_state.data.layout.width / 2), int(game_state.data.layout.height / 2))
+        x_distance_to_center = abs(agent_pos[0] - center_of_board[0])
+
+        # get the other team members index
+        other_team_members = agent.get_team(game_state)
+        other_team_members.remove(agent.index)
+
+        # get the other team members positions as a dictionary with the key being the index and the value being the position
+        other_team_members_pos = {}
+        for other_team_member in other_team_members:
+            other_team_members_pos[other_team_member] = game_state.get_agent_position(other_team_member)
+
+
+        # get opponent team members index
+        opponent_team_members = agent.get_opponents(game_state)
+
+        # get opponent team members positions as a dictionary with the key being the index and the value being the position
+        opponent_team_members_pos = {}
+        for opponent_team_member in opponent_team_members:
+            opponent_team_members_pos[opponent_team_member] = game_state.get_agent_position(opponent_team_member)
+        
+        # get the distance to the nearest opponent that is a ghost
+        # Filter the list of opponents to only include ghosts
+        opponent_ghosts = list(filter(lambda x: game_state.get_agent_state(x).is_pacman == False, opponent_team_members))
+        position_and_distance_to_opponent_ghosts = {}
+        for opponent_ghost in opponent_ghosts:
+            if opponent_team_members_pos[opponent_ghost]:
+                position_and_distance_to_opponent_ghosts[opponent_ghost] = agent.get_maze_distance(agent_pos, opponent_team_members_pos[opponent_ghost])
+
+        if len(position_and_distance_to_opponent_ghosts) > 0:
+            # Get the closest opponent ghost index
+            closest_opponent_ghost_index = min(position_and_distance_to_opponent_ghosts, key=position_and_distance_to_opponent_ghosts.get)
+
+            # Get the closest opponent ghost position
+            closest_opponent_ghost_pos = opponent_team_members_pos[closest_opponent_ghost_index]
+
+
+            # if the agent is a pacman and the closest opponent ghost is within a certain distance, then we need to run away
+            if (game_state.get_agent_state(agent.index).is_pacman or (game_state.get_agent_state(agent.index).is_pacman == False and x_distance_to_center <= GoalPlannerOffensive.BUFFER_ZONE_FROM_CENTER)) and position_and_distance_to_opponent_ghosts[closest_opponent_ghost_index] <= GoalPlannerOffensive.MAX_SAFE_DISTANCE:
+                return center_of_our_side
         
         # get the food list
         if agent.red:
@@ -295,20 +393,23 @@ class GoalPlannerOffensive(GoalPlanner):
         else:
             food_list = game_state.get_red_food().as_list()
 
-        food_manhattan_distances_dict = {
+        if len(food_list) > 0:
+            food_manhattan_distances_dict = {
+                
+            }
+    
+            for food_pos in food_list:
+                food_manhattan_distances_dict[food_pos] = abs(food_pos[0] - agent_pos[0]) + abs(food_pos[1] - agent_pos[1])
             
-        }
-   
-        for food_pos in food_list:
-            food_manhattan_distances_dict[food_pos] = abs(food_pos[0] - agent_pos[0]) + abs(food_pos[1] - agent_pos[1])
-        
-        # sort the food list based on the manhattan distance
-        food_manhattan_distances_dict_sorted = dict(sorted(food_manhattan_distances_dict.items(), key=lambda item: item[1]))
-        
-        
-        # get the closest food position
-        new_goal = list(food_manhattan_distances_dict_sorted.keys())[0]
-        
+            # sort the food list based on the manhattan distance
+            food_manhattan_distances_dict_sorted = dict(sorted(food_manhattan_distances_dict.items(), key=lambda item: item[1]))
+            
+            
+            # get the closest food position
+            new_goal = list(food_manhattan_distances_dict_sorted.keys())[0]
+        else:
+            new_goal = center_of_our_side
+            
         # if the goal is the same as the previous goal, then we don't need to recompute the plan
         if new_goal == agent.goal:
             return agent.goal
@@ -329,20 +430,19 @@ class OffensiveAStarAgent(CaptureAgent):
 
     def register_initial_state(self, game_state):
         self.start = game_state.get_agent_position(self.index)
+        CaptureAgent.register_initial_state(self, game_state)
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
         self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
-        CaptureAgent.register_initial_state(self, game_state)
         
     # Implements A* and executes the plan
     def choose_action(self, game_state):
         print(game_state)
 
+        self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
+        self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state, heuristic=self.offensive_heuristic)
+
         actions = game_state.get_legal_actions(self.index)
         
-        if len(self.plan) <= 0:
-            self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
-            self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
-
         if len(self.plan) > 0:
             next_action = self.plan.pop(0)
             if next_action in actions:
@@ -358,6 +458,66 @@ class OffensiveAStarAgent(CaptureAgent):
                 return random.choice(actions)
         else:
             return random.choice(actions)
+        
+    # Penalty for states with ghosts nearby
+    # Bonus for power pellets along the path
+    # Bonus for regions with a lot of food pellets
+    def offensive_heuristic(self, agent, goal, game_state):
+        
+        ## PENALTY FOR STATES WITH GHOSTS NEARBY
+        OPPONENT_GHOST_WEIGHT = 1
+        OPPONENT_PACMAN_WEIGHT = -1
+        POWER_PELLET_WEIGHT = 0.5
+        
+        heuristic = 0
+        
+        
+        # get the index of opponent team members
+        opponent_team_members = agent.get_opponents(game_state)
+        
+        # get the absolute value of thenoisy estimate of goast distance
+        distances = game_state.agent_distances
+        
+        # opponent distances to agent
+        opponent_ghost_distances = {}
+        opponent_pacman_distances = {}
+        
+        for opponent_team_member in opponent_team_members:
+            
+            # if the opponent is a ghost
+            if game_state.get_agent_state(opponent_team_member).is_pacman == False:
+                opponent_ghost_distances[opponent_team_member] = distances[opponent_team_member]
+            else:
+                opponent_pacman_distances[opponent_team_member] = distances[opponent_team_member]
+        
+        if len(opponent_ghost_distances) > 0:
+            # get the closest distance to an opponent
+            closest_opponent_distance = min(opponent_ghost_distances.values())
+            if game_state.get_agent_state(agent.index).is_pacman:
+                heuristic += OPPONENT_GHOST_WEIGHT * closest_opponent_distance
+            
+        if len(opponent_pacman_distances) > 0:
+            # get the closest distance to a pacman
+            closest_pacman_distance = min(opponent_pacman_distances.values())
+            
+            # if the agent is a ghost
+            if game_state.get_agent_state(agent.index).is_pacman == False:
+                heuristic += OPPONENT_PACMAN_WEIGHT * closest_pacman_distance
+        
+        ## BONUS FOR POWER PELLETS ALONG THE PATH
+        
+        # get the power pellet list
+        if agent.red:
+            power_pellet_list = game_state.get_blue_capsules()
+        else:
+            power_pellet_list = game_state.get_red_capsules()
+        
+        # compute the minimium distance to a power pellet
+        if len(power_pellet_list) > 0:
+            min_power_pellet_distance = min([agent.get_maze_distance(game_state.get_agent_position(agent.index), power_pellet) for power_pellet in power_pellet_list])
+            heuristic += POWER_PELLET_WEIGHT * min_power_pellet_distance
+            
+        return heuristic
         
 
 # Based on the goal, finds the optimal path and executes it
