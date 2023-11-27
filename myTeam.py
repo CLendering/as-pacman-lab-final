@@ -421,7 +421,7 @@ class GoalPlannerOffensive(GoalPlanner):
             ]
 
             # If the agent can reach the power pellet before any ghost, then go for it
-            if not ghost_distances_to_pellet or agent_distance_to_pellet < min(
+            if ghost_distances_to_pellet and agent_distance_to_pellet < min(
                 ghost_distances_to_pellet
             ):
                 return closest_power_pellet
@@ -476,6 +476,18 @@ class GoalPlannerOffensive(GoalPlanner):
                     closest_opponent_ghost_index
                 ] <= GoalPlannerOffensive.MAX_SAFE_DISTANCE:
                     return center_of_our_side
+            else:
+                # If there are scared ghosts, then we should go for the scared ghosts
+                scared_ghost_positions = [
+                    game_state.get_agent_position(opponent)
+                    for opponent in scared_ghosts
+                ]
+                if len(scared_ghost_positions)>0:
+                    closest_scared_ghost = min(
+                        scared_ghost_positions,
+                        key=lambda ghost: agent.get_maze_distance(agent_pos, ghost),
+                    )
+                    return closest_scared_ghost
 
         # get the food list
         if agent.red:
@@ -571,7 +583,7 @@ class OffensiveAStarAgent(CaptureAgent):
         POWER_PELLET_WEIGHT = 0.5  # Reward for approaching a power pellet
         FOOD_DENSITY_WEIGHT = 0.2  # Reward for being in a region with a lot of food
         SEARCH_RADIUS = 5  # Radius to search for food
-        SCARED_GHOST_REWARD = 2  # Reward for approaching a scared ghost
+        SCARED_GHOST_REWARD = 10  # Reward for approaching a scared ghost
 
         heuristic = 0
 
@@ -599,7 +611,11 @@ class OffensiveAStarAgent(CaptureAgent):
         if len(opponent_ghost_distances) > 0:
             # get the closest distance to an opponent
             closest_opponent_distance = min(opponent_ghost_distances.values())
-            if game_state.get_agent_state(agent.index).is_pacman:
+            # get the closest opponent index
+            closest_opponent_index = min(
+                opponent_ghost_distances, key=opponent_ghost_distances.get
+            )
+            if game_state.get_agent_state(agent.index).is_pacman and not game_state.get_agent_state(closest_opponent_index).scared_timer > 0:
                 heuristic += OPPONENT_GHOST_WEIGHT * closest_opponent_distance
 
         if len(opponent_pacman_distances) > 0:
