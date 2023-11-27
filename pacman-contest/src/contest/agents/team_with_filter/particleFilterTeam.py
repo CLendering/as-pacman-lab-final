@@ -25,8 +25,22 @@ from contest.captureAgents import CaptureAgent
 from contest.game import Directions, Configuration, Actions
 from contest.util import nearestPoint, manhattanDistance, Counter
 from contest.capture import SONAR_NOISE_RANGE, SONAR_NOISE_VALUES
+from contest.pacman import GhostRules
 import numpy as np
-import filterpy.kalman as kf
+from collections import deque
+import logging
+
+# ---- Logging ----
+console_log_handler = logging.StreamHandler()  # Console handler
+file_log_handler = logging.FileHandler('particleFilterTeam.log')  # File handler
+console_log_handler.setLevel(logging.INFO)
+file_log_handler.setLevel(logging.DEBUG)
+c_format = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
+f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_log_handler.setFormatter(c_format)
+file_log_handler.setFormatter(f_format)
+
+
 
 # Needs to be initialized in CaptureAgent.register_initial_state
 # TODO: could put this in some instance of class CommunicationModule, that one instance can be shared by both our agents
@@ -60,9 +74,30 @@ def is_reverse(new_velocity, prev_velocity):
     # A reversal occurs if the new direction is the opposite of the previous one
     return np.array_equal(new_direction, -prev_direction)
 
+def systematic_resample(weights):
+    N = len(weights)
+    positions = (np.arange(N) + np.random.random()) / N
+
+    indices = np.zeros(N, dtype=int)
+    cumulative_sum = np.cumsum(weights)
+    i, j = 0, 0
+    while i < N:
+        if positions[i] < cumulative_sum[j]:
+            indices[i] = j
+            i += 1
+        else:
+            j += 1
+    return indices
+
 class EnemyPositionParticleFilter:
     # TODO maybe I need to add some noise to some other part here?
-    def __init__(self, num_particles, walls, initial_position):
+    def __init__(self, num_particles, walls, initial_position, tracked_enemy_index, max_noisy_estimates=10):
+        self.logger = logging.getLogger(f'EnemyPositionParticleFilter (enemy {tracked_enemy_index})')
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.addHandler(console_log_handler)
+
+        self.recent_noisy_estimates = deque([] * max_noisy_estimates ,maxlen=max_noisy_estimates)
+
         # dtype needs to be float because scared ghosts move slower (0.5), normal speed is 1.0 
         self.particles = np.full((num_particles, 2), initial_position, dtype=float)
         self.weights = np.full(num_particles, 1/num_particles)
@@ -70,24 +105,46 @@ class EnemyPositionParticleFilter:
 
         self.walls = walls
         self.spawn_position = initial_position
-        self.previous_velocities = np.zeros((num_particles, 2), dtype=float)  # Initialize with zero velocity
+        self.tracked_enemy_index = tracked_enemy_index
+
+        self.legal_positions = np.array([[x, y] for x in range(self.walls.width) for y in range(self.walls.height) if not self.walls[x][y]])
+
+        # Initialize particle velocities
+        dummy_config = Configuration(initial_position, Directions.STOP)
+        legal_directions = Actions.get_possible_actions(dummy_config, walls)
+        # strict bias towards non-zero velocities
+        legal_velocities = np.array([Actions.direction_to_vector(action, GhostRules.GHOST_SPEED) for action in legal_directions if action != Directions.STOP])
+        # Handle purely theoretical edge case where no legal moves result in velocities of zero
+        if legal_velocities.size == 0:
+            self.velocities = np.zeros((num_particles, 2))
+        else:
+            # Randomly select non-zero velocities for particles
+            indices = np.random.choice(len(legal_velocities), size=num_particles)
+            self.velocities =  legal_velocities[indices]
+
 
     def move_particles(self):
         """
         Move particles within the allowed range and considering the map's walls.
         Should be called exactly once after the enemy has actually moved. (e.g. agent 2 calls this in his turn to update enemy 1's position)
         """
+        self.logger.info(f'Moving particles')
+        current_particles_counter = Counter()
+        for pos in self.particles:
+            current_particles_counter[tuple(pos)] += 1
+        self.logger.info(f'Current particle positions: {current_particles_counter}')
+
+
         SPEED = 1.0 # TODO change if enemy is scared. needs to be reset if scared ghost is eaten. also, use normal speed when scared but on the pacman side.
         TURN_OR_MOVEMENT_START_PROBABILITY = 0.3 # TODO tune these values (or maybe even learn them)
         REVERSE_PROBABILITY = 0.1
         STOP_PROBABILITY = 0.05
 
-        #action_counter = Counter()
+        action_counter = Counter()
 
-        for particle_index, p in enumerate(self.particles):
-            x, y = p
-            dummy_config = Configuration((x, y), 'North')
-            possible_actions = Actions.get_possible_actions(dummy_config, self.walls)
+        for particle_index, ((x, y), v) in enumerate(zip(self.particles, self.velocities)):
+            config = Configuration((x, y), Actions.vector_to_direction(v)) # or use 'STOP'?
+            possible_actions = Actions.get_possible_actions(config, self.walls)
             # TODO: make action selection better by not drawing uniformly but
             # - making stop action way less probable
             # - increasing probability of actions which have the same direction as the previous action (-> so save velocity vector in another np.array)
@@ -101,7 +158,7 @@ class EnemyPositionParticleFilter:
             # Calculate probabilities for each action
             action_probabilities = np.zeros(len(possible_actions))
             for action_index, action in enumerate(possible_actions):
-                prev_velocity = self.previous_velocities[action_index]
+                prev_velocity = self.velocities[action_index] # TODO hier ist ein bug
                 new_velocity  = np.array(Actions.direction_to_vector(action, SPEED)) # TODO: use scared ghost speed when applicable (particle in enemy half & enemy has scared timer)
 
                 # TODO check comparison actually works or do I need to convert to np array & use np comparison methods
@@ -119,14 +176,19 @@ class EnemyPositionParticleFilter:
             
             # Choose action based on probabilities
             action = np.random.choice(possible_actions, p=action_probabilities)
-            dx, dy = Actions.direction_to_vector(action, SPEED)
+            dx, dy = Actions.direction_to_vector(action, SPEED) # TODO: use scared ghost speed when applicable (particle in enemy half & enemy has scared timer)
 
-            #action_counter[action] +=1
+            action_counter[action] +=1
             
-            # Move particles
+            # Update particle position and velocity
             self.particles[particle_index] = x + dx, y + dy
-            self.previous_velocities[particle_index] = [dx, dy]
-        #print(action_counter)
+            self.velocities[particle_index] = [dx, dy]
+        
+        self.logger.info(f'Selected actions: {action_counter}')
+        new_particles_counter = Counter()
+        for pos in self.particles:
+            new_particles_counter[tuple(pos)] += 1
+        self.logger.info(f'New particle positions: {new_particles_counter}')
     
     # TODO call update_with_exact_position with enemy spawn when killing an enemy
     def update_with_exact_position(self, position):
@@ -148,6 +210,7 @@ class EnemyPositionParticleFilter:
         If an agent gets an exact position estimate, 
         they should not call this method but update_with_exact_position instead.
         """
+        self.recent_noisy_estimates.append(measured_distance)
         self.__weigh_particles(measured_distance, agent_position)
         self.__resample_particles()
 
@@ -220,10 +283,41 @@ class EnemyPositionParticleFilter:
         
     def __resample_particles(self):
        """
-       Resample particles with replacement based on their weights.
+       Resample particles based on their weights.
        """
-       indices = np.random.choice(np.arange(self.num_particles), size=self.num_particles, p=self.weights)
+       # multinomial resample (with replacement) based on weights
+       #indices = np.random.choice(np.arange(self.num_particles), size=self.num_particles, p=self.weights)
+       indices = systematic_resample(self.weights)
+       # TODO use systematic resample instead of multinomial resample
        self.particles = self.particles[indices]
+       self.velocities = self.velocities[indices]
+
+    # TODO continue here
+    def __generate_recent_random_particles(self, num_particles):
+        """
+        Generate random particles with a preference for positions closer to recent noisy estimates.
+        """
+        recent_random_particles = []
+        num_estimates = len(self.recent_noisy_estimates)
+
+        # Create a probability distribution based on proximity to noisy estimates
+        probabilities = np.zeros(len(self.legal_positions))
+        for index, noisy_estimate in enumerate(self.recent_noisy_estimates):
+            for i, pos in enumerate(self.legal_positions):
+                distance = np.sum(np.abs(pos - self.agent_position))
+                if distance == noisy_estimate:
+                    probabilities[i] += (num_estimates - index)  # Higher weight for newer estimates
+
+        # Normalize probabilities
+        probabilities /= probabilities.sum()
+
+        # Choose random positions based on the probability distribution
+        chosen_indices = np.random.choice(len(self.legal_positions), size=num_particles, p=probabilities)
+        recent_random_particles = self.legal_positions[chosen_indices]
+
+        return recent_random_particles
+
+
 
     # TODO: use some random particles to fight particle deprivation
     # def __resample_particles(self):
@@ -309,6 +403,10 @@ class ReflexCaptureAgent(CaptureAgent):
     def __init__(self, index, time_for_computing=.1):
         super().__init__(index, time_for_computing)
         self.start = None
+
+        self.logger = logging.getLogger(f'Agent {self.index})')
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.addHandler(console_log_handler)
     
 
     def __del__(self):
@@ -350,7 +448,8 @@ class ReflexCaptureAgent(CaptureAgent):
             for enemy in self.get_opponents(game_state):
                 enemyPositionParticleFilters[enemy] = EnemyPositionParticleFilter(num_particles=1000, 
                                                walls=game_state.get_walls(), 
-                                               initial_position=game_state.get_agent_position(enemy)) 
+                                               initial_position=game_state.get_agent_position(enemy),
+                                               tracked_enemy_index=enemy) 
         self.finishedFirstMove = False
         
     def get_exact_opponent_distances(self, game_state): 
@@ -364,15 +463,43 @@ class ReflexCaptureAgent(CaptureAgent):
         return [distances[i] for i in self.get_opponents(game_state)]
 
 
+    def update_particle_filter(self, game_state):
+        """
+        - Moves the particles of the preceding enemy's filter
+        - Updates particle weights and resamples particles of every enemy's filter with exact position or noisy distance estimate
+        """
+        global enemyPositionParticleFilters
+
+        # Update the particle filter of the preceding enemy
+        # only if it's not the very first move of the game (i.e. 1200 steps are left)
+        if game_state.data.timeleft != 1200:
+            # Determine the index of the enemy who just moved
+            enemy_who_just_moved = (self.index - 1) % len(game_state.teams)
+            # move particles of filter one time step into the future
+            enemyPositionParticleFilters[enemy_who_just_moved].move_particles()
+        
+        # for all enemies, update particle filter with exact position or noisy distance
+        agent_position = game_state.get_agent_position(self.index)
+        noisy_distances = game_state.get_agent_distances()
+        for enemy_index in self.get_opponents(game_state):
+            pf = enemyPositionParticleFilters[enemy_index]
+            # try getting an exact position and update with the exact position
+            exact_pos = game_state.get_agent_position(enemy_index)
+            if exact_pos is not None:
+                self.logger.info(f'Got exact position of enemy {enemy_index} at {exact_pos}!')
+                pf.update_with_exact_position(exact_pos)
+            # if enemy agent is not seen directly, update particle filter with noisy distance
+            else:
+                pf.update_with_noisy_distance(noisy_distances[enemy_index], agent_position)
+
+
     def choose_action(self, game_state):
         """
         Picks among the actions with the highest Q(s,a).
         """
-        print(f"Agent {self.index}'s turn")
+        self.logger.info(f"Turn starts")
 
-        PRINT = False
         actions = game_state.get_legal_actions(self.index)
-        if PRINT: print(f"I'm agent {self.index}")
         noisy_distances = self.get_noisy_opponent_distances(game_state)
         # make the comparison fair - filter also gets exact distances when possible
         exact_distances = self.get_exact_opponent_distances(game_state)
@@ -385,24 +512,10 @@ class ReflexCaptureAgent(CaptureAgent):
 
         global enemyPositionParticleFilters
 
-        enemies = self.get_opponents(game_state)
-        # move particle filter one time step into the future
-        # for the enemy who played just before our agent
-        enemy_who_just_moved = (self.index - 1) % len(game_state.teams)
-        # but only move particles if the enemy player actually moved (i.e. if I have the first move in the game, don't update enemy's particle filter)
-        if not self.finishedFirstMove or self.index > enemy_who_just_moved:
-            enemyPositionParticleFilters[enemy_who_just_moved].move_particles()
-        
-        # update particle filter with exact position or noisy distance
-        for enemy_index, noisy_distance in zip(enemies, noisy_distances):
-            pf = enemyPositionParticleFilters[enemy_index]
-            # try getting an exact position
-            exact_pos = game_state.get_agent_position(enemy_index)
-            if exact_pos is not None:
-                pf.update_with_exact_position(exact_pos)
-            else:
-                pf.update_with_noisy_distance(noisy_distance, agent_position)
+        self.update_particle_filter(game_state)
 
+        enemies = self.get_opponents(game_state)
+        
         # get new estimates of enemy positions
         enemy_position_estimates = [enemyPositionParticleFilters[enemy].estimate_position() for enemy in sorted(enemyPositionParticleFilters.keys())]
         enemy_distance_estimates = [manhattanDistance(agent_position, enemy_pos) for enemy_pos in enemy_position_estimates]
@@ -427,12 +540,9 @@ class ReflexCaptureAgent(CaptureAgent):
         history_DEBUG_actual_enemy_distances.append(DEBUG_actual_enemy_distances)
         history_noisy_distances.append(noisy_distances)
 
-        if PRINT: print(f'{noisy_distances=}')
-        if PRINT: print(f'true_distances={DEBUG_actual_enemy_distances}')
 
         error_noisy_distances = np.array(DEBUG_actual_enemy_distances) - np.array(noisy_distances)
         MSE_noisy_distances = (error_noisy_distances**2).mean()
-        if PRINT: print(f'{MSE_noisy_distances=}')
 
 
         # You can profile your evaluation time by uncommenting these lines

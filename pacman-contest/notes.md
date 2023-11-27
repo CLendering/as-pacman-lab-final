@@ -1,3 +1,28 @@
+
+
+
+
+
+One bug I had in my particle filter was that I did this to get the legal actions for a position (x, y):
+
+```
+from contest.game import Directions, Configuration, Actions
+dummy_config = Configuration((x, y), 'North')
+possible_actions = Actions.get_possible_actions(dummy_config, self.walls)
+```
+
+But using 'North' for the dummy_config would cause `Actions.get_possible_actions` to return just ['North'] in some cases and disregard the walls! If you use 'Stop' for the dummy_config, it works as expected.
+
+Just so you know and don't get fucked by the same bug haha
+
+
+# particle filter todos
+
+check out display_distributions_over_positions
+
+use systematic resample instead of multinomial in __resample_particles
+
+
 When pacman is eaten, he respawns immediately and loses the food he was carrying.
 
 # improving distance reading

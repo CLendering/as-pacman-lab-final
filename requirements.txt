@@ -17,4 +17,3 @@ urllib3==1.26.9
 wrapt==1.14.0
 # for the filters
 numpy==1.24.4
-filterpy==1.4.5 # might remove this, just needed this for kalman filter 
