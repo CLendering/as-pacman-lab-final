@@ -225,7 +225,7 @@ class PacmanGraphics:
         if blueName:
             self.blueName = blueName
 
-        self.particleImages = {0: [], 1: [], 2: [], 3: []}
+        self.particleFilterImages = {0: [], 1: [], 2: [], 3: []}
 
     def initialize(self, state, isBlue=False):
         self.isBlue = isBlue
@@ -324,41 +324,76 @@ class PacmanGraphics:
         pass
 
     def animateEnemyPositionParticleFilters(self):
+        DRAW_PARTICLES = False
+        DRAW_CONDENSED_POSITION_DISTRIBUTION = True
+        
         for particle_filter_dict in [self.redEnemyPositionParticleFilters, self.blueEnemyPositionParticleFilters]:
             if particle_filter_dict is not None:
                 for enemy, particle_filter in particle_filter_dict.items():
-                    # delete old particles
-                    old_particle_images, self.particleImages[enemy] = self.particleImages[enemy][:], []
-                    for particle_image in old_particle_images:
+                    # delete old images
+                    old_images, self.particleFilterImages[enemy] = self.particleFilterImages[enemy][:], []
+                    for particle_image in old_images:
                         remove_from_screen(particle_image)
 
-                    # draw new particles
-                    particles = particle_filter.particles
-                    particle_counter = Counter()
-                    for pos in particles:
-                        particle_counter[tuple(pos)] += 1
+                    if DRAW_PARTICLES:
+                        # draw new particles
+                        self.drawParticleFilterParticles(particle_filter)
                     
-                    for pos, n in particle_counter.items():
-                        screen_pos = self.to_screen(pos)
-                        MIN_PARTICLE_SIZE = 0.05
-                        MAX_PARTICLE_SIZE = 1
-                        particle_size = MIN_PARTICLE_SIZE + (MAX_PARTICLE_SIZE - MIN_PARTICLE_SIZE) * ((n/particle_filter.num_particles) ** 1/2)
-                        scaled_particle_size = self.gridSize * particle_size
-                        particle_image = circle(screen_pos,
-                                 scaled_particle_size,
-                                 outlineColor='#ffffff', fillColor=GHOST_COLORS[enemy],
-                                 width=0.6 * scaled_particle_size,style='chord')
-                        self.particleImages[enemy].append(particle_image)
-                    current_estimate = particle_filter.estimate_position()
-                    current_estimate_screen_pos = self.to_screen(current_estimate)
-                    current_estimate_marker = create_text(current_estimate_screen_pos, GHOST_COLORS[enemy], 'X', size=24, anchor='center')
-                    self.particleImages[enemy].append(current_estimate_marker)
+                    if DRAW_CONDENSED_POSITION_DISTRIBUTION:
+                        self.drawParticleFilterCondensedPositionDistribution(particle_filter)
+        refresh()
 
-                    refresh()
+    def drawParticleFilterParticles(self, particle_filter):
+        # draw new particles
+        particles = particle_filter.particles
+        enemy = particle_filter.tracked_enemy_index
+        particle_counter = Counter()
+        for pos in particles:
+            particle_counter[tuple(pos)] += 1
+        
+        for pos, n in particle_counter.items():
+            screen_pos = self.to_screen(pos)
+            MIN_PARTICLE_SIZE = 0.05
+            MAX_PARTICLE_SIZE = 1
+            particle_size = MIN_PARTICLE_SIZE + (MAX_PARTICLE_SIZE - MIN_PARTICLE_SIZE) * ((n/particle_filter.num_particles) ** 1/2)
+            scaled_particle_size = self.gridSize * particle_size
+            particle_image = circle(screen_pos,
+                    scaled_particle_size,
+                    outlineColor='#ffffff', fillColor=GHOST_COLORS[enemy],
+                    width=0.6 * scaled_particle_size,style='chord')
+            self.particleFilterImages[enemy].append(particle_image)
+        current_estimate = particle_filter.estimate_position()
+        current_estimate_screen_pos = self.to_screen(current_estimate)
+        current_estimate_marker = create_text(current_estimate_screen_pos, GHOST_COLORS[enemy], 'X', size=24, anchor='center')
+        self.particleFilterImages[enemy].append(current_estimate_marker)
 
 
-
-
+    def drawParticleFilterCondensedPositionDistribution(self, particle_filter):
+        # draw new particles
+        position_distribution = particle_filter._EnemyPositionParticleFilter__get_condensed_position_distribution()
+        enemy = particle_filter.tracked_enemy_index
+        min_prob = position_distribution.min()
+        max_prob = position_distribution.max()
+        MIN_SIZE = 0.05
+        MAX_SIZE = 1
+        for x in range(particle_filter.walls.width):
+            for y in range(particle_filter.walls.height):
+                    prob = position_distribution[x, y]
+                    if prob == 0:
+                        continue
+                    
+                    screen_pos = self.to_screen((x, y))
+                    position_size = MIN_SIZE + (MAX_SIZE - MIN_SIZE) * ((prob/max_prob) ** 1/2)
+                    scaled_position_size = self.gridSize * position_size
+                    position_image = circle(screen_pos,
+                            scaled_position_size,
+                            outlineColor='#ffffff', fillColor=GHOST_COLORS[enemy],
+                            width=0.6 * scaled_position_size,style='chord')
+                    self.particleFilterImages[enemy].append(position_image)
+        current_estimate = particle_filter.estimate_position()
+        current_estimate_screen_pos = self.to_screen(current_estimate)
+        current_estimate_marker = create_text(current_estimate_screen_pos, GHOST_COLORS[enemy], 'X', size=24, anchor='center')
+        self.particleFilterImages[enemy].append(current_estimate_marker)
 
     def make_window(self, width, height):
         grid_width = (width - 1) * self.gridSize

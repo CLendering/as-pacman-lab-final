@@ -24,7 +24,7 @@ import random
 from contest.captureAgents import CaptureAgent
 from contest.game import Directions, Configuration, Actions
 from contest.util import nearestPoint, manhattanDistance, Counter
-from contest.capture import SONAR_NOISE_RANGE, SONAR_NOISE_VALUES
+from contest.capture import SONAR_NOISE_RANGE, SONAR_NOISE_VALUES, SIGHT_RANGE
 from contest.pacman import GhostRules
 import numpy as np
 from collections import deque
@@ -276,6 +276,8 @@ class EnemyPositionParticleFilter:
         # add new position distribution
         self.__add_new_noisy_position_distribution(agent_position, noisy_distance)
 
+        # reset probabilities of positions in SIGHT_RANGE to zero
+        self.__clear_probabilities_in_sight_range(agent_position)
  
     def __flatten_noisy_position_distributions(self):
         """
@@ -310,9 +312,6 @@ class EnemyPositionParticleFilter:
             self.noisy_position_distributions[i] = flattened_distribution
 
 
-
-
-
     def __add_new_noisy_position_distribution(self, agent_position, noisy_distance):
         noise_range=max(SONAR_NOISE_VALUES)
         position_distribution = np.zeros((self.walls.width, self.walls.height))
@@ -329,6 +328,24 @@ class EnemyPositionParticleFilter:
         position_distribution /= position_distribution.sum()
 
         self.noisy_position_distributions.append(position_distribution)
+
+    def __clear_probabilities_in_sight_range(self, agent_position):
+        """
+        Update all probability distributions such that positions within SIGHT_RANGE of agent_position are set to zero.
+        """
+        for distribution in self.noisy_position_distributions:
+            for x in range(self.walls.width):
+                for y in range(self.walls.height):
+                    if self.__within_sight_range(agent_position, (x, y)):
+                        distribution[x, y] = 0
+            # normalize 
+            distribution /= distribution.sum()
+
+    def __within_sight_range(self, agent_pos, pos):
+        """
+        Check if pos is within SIGHT_RANGE of agent_pos.
+        """
+        return np.linalg.norm(np.array(agent_pos) - np.array(pos), ord=1) <= SIGHT_RANGE
 
 
     def __get_condensed_position_distribution(self):
