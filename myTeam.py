@@ -481,8 +481,10 @@ class GoalPlannerOffensive(GoalPlanner):
                 scared_ghost_positions = [
                     game_state.get_agent_position(opponent)
                     for opponent in scared_ghosts
+                    if game_state.get_agent_position(opponent)
                 ]
-                if len(scared_ghost_positions)>0:
+                # If there are scared ghosts, then we should go for the scared ghosts
+                if len(scared_ghost_positions) > 0:
                     closest_scared_ghost = min(
                         scared_ghost_positions,
                         key=lambda ghost: agent.get_maze_distance(agent_pos, ghost),
@@ -615,7 +617,11 @@ class OffensiveAStarAgent(CaptureAgent):
             closest_opponent_index = min(
                 opponent_ghost_distances, key=opponent_ghost_distances.get
             )
-            if game_state.get_agent_state(agent.index).is_pacman and not game_state.get_agent_state(closest_opponent_index).scared_timer > 0:
+            if (
+                game_state.get_agent_state(agent.index).is_pacman
+                and not game_state.get_agent_state(closest_opponent_index).scared_timer
+                > 0
+            ):
                 heuristic += OPPONENT_GHOST_WEIGHT * closest_opponent_distance
 
         if len(opponent_pacman_distances) > 0:
