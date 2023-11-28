@@ -349,6 +349,11 @@ class PacmanGraphics:
                                  outlineColor='#ffffff', fillColor=GHOST_COLORS[enemy],
                                  width=0.6 * scaled_particle_size,style='chord')
                         self.particleImages[enemy].append(particle_image)
+                    current_estimate = particle_filter.estimate_position()
+                    current_estimate_screen_pos = self.to_screen(current_estimate)
+                    current_estimate_marker = create_text(current_estimate_screen_pos, GHOST_COLORS[enemy], 'X', size=24, anchor='center')
+                    self.particleImages[enemy].append(current_estimate_marker)
+
                     refresh()
 
 

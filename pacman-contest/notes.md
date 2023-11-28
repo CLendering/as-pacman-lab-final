@@ -1,4 +1,9 @@
+TODO continue with https://chat.openai.com/c/5f3f8d35-51c5-4067-9cde-37a86f9ac498
+calculate noisy position estimates by taking the agents position and adding their noisy distance estimate to that to calculate possible enemy positions and also taking walls into account
 
+and then use Noisy Position Data to Add Random Positions
+
+keep track of noisy positions in deque
 
 
 

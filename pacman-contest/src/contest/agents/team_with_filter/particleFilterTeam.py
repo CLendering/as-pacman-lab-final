@@ -74,12 +74,15 @@ def is_reverse(new_velocity, prev_velocity):
     # A reversal occurs if the new direction is the opposite of the previous one
     return np.array_equal(new_direction, -prev_direction)
 
-def systematic_resample(weights):
+def systematic_resample(weights, n=None):
     N = len(weights)
+    n = N if n is None else n
     positions = (np.arange(N) + np.random.random()) / N
 
     indices = np.zeros(N, dtype=int)
     cumulative_sum = np.cumsum(weights)
+    cumulative_sum[-1] = 1 # prevent numerical errors
+
     i, j = 0, 0
     while i < N:
         if positions[i] < cumulative_sum[j]:
@@ -87,8 +90,17 @@ def systematic_resample(weights):
             i += 1
         else:
             j += 1
+            if j >= N:  # Prevent index out of bounds
+                raise 'WTF?!' # TODO don't throw exception and just let it go on
+                j = N - 1
+
+    if n < N:
+        return np.random.choice(indices, size=n, replace=False)
+    
     return indices
 
+# TODO check runtime of particle filter, add way to scale down or completely 
+# shut down if it takes too much time and we risk defaulting game bc of that (1 sec max per turn I think)
 class EnemyPositionParticleFilter:
     # TODO maybe I need to add some noise to some other part here?
     def __init__(self, num_particles, walls, initial_position, tracked_enemy_index, max_noisy_estimates=10):
@@ -96,7 +108,12 @@ class EnemyPositionParticleFilter:
         self.logger.setLevel(logging.DEBUG)
         self.logger.addHandler(console_log_handler)
 
-        self.recent_noisy_estimates = deque([] * max_noisy_estimates ,maxlen=max_noisy_estimates)
+        # Distributions based on noisy measurements, not actual particle positions
+        # probability distributions of possible positions calculated from noisy distance estimates and agent position
+        # this is used as further input to update the belief (particles) of the particle filter
+        initial_position_distribution = np.zeros((walls.width, walls.height))
+        initial_position_distribution[initial_position] = 1
+        self.noisy_position_distributions = deque([np.copy(initial_position_distribution) for _ in range(max_noisy_estimates)], maxlen=max_noisy_estimates)
 
         # dtype needs to be float because scared ghosts move slower (0.5), normal speed is 1.0 
         self.particles = np.full((num_particles, 2), initial_position, dtype=float)
@@ -202,7 +219,13 @@ class EnemyPositionParticleFilter:
         self.particles[:] = position
         self.weights[:] = 1/self.num_particles
 
-    def update_with_noisy_distance(self, measured_distance, agent_position):
+        position_distribution = np.zeros((self.walls.width, self.walls.height))
+        position_distribution[position] = 1
+        for i in range(len(self.noisy_position_distributions)):
+            self.noisy_position_distributions[i] = np.copy(position_distribution)
+
+
+    def update_with_noisy_distance(self, agent_position, noisy_distance):
         """
         Recalculates weights and resamples particles with the given noisy distance.
         Every agent should call this in every turn with all noisy estimates they get.
@@ -210,9 +233,10 @@ class EnemyPositionParticleFilter:
         If an agent gets an exact position estimate, 
         they should not call this method but update_with_exact_position instead.
         """
-        self.recent_noisy_estimates.append(measured_distance)
-        self.__weigh_particles(measured_distance, agent_position)
-        self.__resample_particles()
+        self.__update_noisy_position_distributions(agent_position, noisy_distance)
+        condensed_position_distribution = self.__get_condensed_position_distribution()
+        self.__weigh_particles(condensed_position_distribution)
+        self.__resample_particles(condensed_position_distribution)
 
     def estimate_position(self):
         """
@@ -237,7 +261,128 @@ class EnemyPositionParticleFilter:
         # TODO save last estimates and in this case pick the particle closest to last estimates
         mean_position = np.random.choice(nearest_particles)
         return mean_position
-    
+
+
+    def __update_noisy_position_distributions(self, agent_position, noisy_distance):
+        """
+        Update the noisy position distributions based on a new noisy distance measurement.
+        """
+        # TODO add method which sets position probability of cells within sight range of agent to zero
+
+
+        # make old position distributions fade into adjacent cells
+        self.__flatten_noisy_position_distributions()
+
+        # add new position distribution
+        self.__add_new_noisy_position_distribution(agent_position, noisy_distance)
+
+ 
+    def __flatten_noisy_position_distributions(self):
+        """
+        Flatten out the noisy position distributions to account for potential movement as time progresses.
+        """
+        # Each agent (enemy or friendly) moves once every four turns. They can move at most 1 grid cell per turn. The particle filters for every enemy is updated every two turns. So every time a particle filter is updated, the enemy moves on average by +-0.5  (because it can move by 1 every four turns and the particle filters are updated every two turns). The same goes for the measuring agent. So the true distance of a measuring agent to every enemy can change by |+-0.5|+|+-0.5|=1 every two turns. The position of an enemy agent can change by one of the vectors in [(-0.5, 0), (0, -0.5), (0, 0), (0.5, 0), (0,0.5)] every two turns. 
+        # Remember that The position of an enemy agent can change by one of the vectors in [(-0.5, 0), (0, -0.5), (0, 0), (0.5, 0), (0,0.5)] every two turns when the particle filters are being updated.
+
+        # TODO I'm not sure if this is the best idea, probabilities might oscillate back and forth
+        # to mitigate this I'd have to add some temporal/directional memory 
+
+        STOP_PROBABILITY = 0.05
+        for i in range(len(self.noisy_position_distributions)):
+            distribution = self.noisy_position_distributions[i]
+            flattened_distribution = np.zeros_like(distribution)
+
+            for (x, y), probability in np.ndenumerate(distribution):
+                # Skip cells which don't have any probability to flatten out in the first place
+                if probability == 0:  
+                    continue
+                
+                # Probability of staying in the same cell
+                flattened_distribution[x][y] += probability * STOP_PROBABILITY
+
+                # Spread out remaining probability to adjacent cells
+                adjacent_cells = self.__get_adjacent_cells(x, y)
+                if adjacent_cells:  # Ensure there are adjacent cells
+                    move_probability = (probability * (1 - STOP_PROBABILITY)) / len(adjacent_cells)
+                    for new_x, new_y in adjacent_cells:
+                        flattened_distribution[new_x][new_y] += move_probability
+
+            self.noisy_position_distributions[i] = flattened_distribution
+
+
+
+
+
+    def __add_new_noisy_position_distribution(self, agent_position, noisy_distance):
+        noise_range=max(SONAR_NOISE_VALUES)
+        position_distribution = np.zeros((self.walls.width, self.walls.height))
+
+        for x in range(self.walls.width):
+            for y in range(self.walls.height):
+                if not self.walls[x][y]:
+                    distance = abs(x - agent_position[0]) + abs(y - agent_position[1])  # Manhattan distance
+                    if noisy_distance - noise_range <= distance <= noisy_distance + noise_range:
+                        # Uniform weighting for positions within the noise range
+                        position_distribution[x, y] += 1
+
+        # Normalize the distribution
+        position_distribution /= position_distribution.sum()
+
+        self.noisy_position_distributions.append(position_distribution)
+
+
+    def __get_condensed_position_distribution(self):
+        """
+        Returns a condensed version of all distributions in self.noisy_position_distributions.
+        """
+        # These way the noise hopefully cancels out
+        condensed_distribution = np.sum(self.noisy_position_distributions, axis=0)
+        # normalize
+        condensed_distribution /= np.sum(self.noisy_position_distributions)
+        return condensed_distribution
+        
+
+    def __weigh_particles(self, condensed_position_distribution):
+        """
+        Weigh particles based on the condensed position distribution.
+        """
+        int_particles = np.rint(self.particles).astype(int)
+        self.weights[:] = condensed_position_distribution[int_particles[:,0], int_particles[:,1]]
+
+        
+    def __resample_particles(self, condensed_position_distribution):
+        """
+        Resample particles based on their weights.
+        Also adds random particles based on condensed_position_distribution.
+        """
+        N = self.num_particles
+        # TODO tune random particles fraction
+        RANDOM_PARTICLES_FRACTION=0.05 
+        num_random_particles = int(N * RANDOM_PARTICLES_FRACTION)
+        num_resampled_particles = N - num_random_particles
+ 
+        # Resample based on weights for the majority of particles
+        indices = systematic_resample(self.weights, num_resampled_particles)
+        self.particles[:num_resampled_particles] = self.particles[indices]
+        self.velocities[:num_resampled_particles] = self.velocities[indices]
+ 
+        # Add random particles
+        # TODO try constraining random particles to be near to 
+        # the current estimated position? -> set prob to 0 elsewhere in condensed_position_distribution before drawing?
+        flat_distribution = condensed_position_distribution.flatten()
+        random_indices = np.random.choice(np.arange(len(flat_distribution)), size=num_random_particles, p=flat_distribution)
+        self.particles[num_resampled_particles:] = np.array(np.unravel_index(random_indices, condensed_position_distribution.shape)).T
+        self.velocities[num_resampled_particles:] = self.__generate_random_velocities(num_random_particles)
+ 
+
+    def __generate_random_velocities(self, num_random_particles):
+        # TODO implement
+        # For the generation of the velocities of random particles, the velocity should be calculated such that:
+        # - the velocity is legal (use Actions.get_possible_actions(Configuration(position, Directions.STOP), walls) to check this)
+        # - most velocities should point towards the current most probable position in condensed_position_distribution
+        return np.full((num_random_particles, 2), (0,0), dtype=float)
+
+
     def __is_valid(self, position):
         """
         Checks if position is valid for an agent (i.e. it is not inside a wall).
@@ -245,64 +390,30 @@ class EnemyPositionParticleFilter:
         x, y = position
         x_int, y_int = int(x + 0.5), int(y + 0.5)
         return not self.walls[x_int][y_int]
-
-    def __weigh_particles(self, measured_distance, agent_position):
+    
+    def __get_adjacent_cells(self, x, y):
         """
-        Weigh particles based on how closely they match the measured distance.
+        Get adjacent cells to the given cell (x, y), considering the walls.
         """
-        self.latest_noisy_distance = measured_distance
-        self.latest_agent_position = agent_position
-        for i in range(self.num_particles):
-            # Calculate the predicted Manhattan distance from the particle to the agent
-            predicted_distance = np.sum(np.abs(self.particles[i] - agent_position))
+        adjacent_cells = []
+        for dx, dy in [(1, 0), (0, 1), (-1, 0), (0, -1)]:
+            new_x, new_y = x + dx, y + dy
+            if 0 <= new_x < self.walls.width and 0 <= new_y < self.walls.height and not self.walls[new_x][new_y]:
+                adjacent_cells.append((new_x, new_y))
+        return adjacent_cells
 
-            # Compare with the measured distance and check its likelihood 
-            # given that we know the noise is a discrete uniform distribution 
-            # of the values in `SONAR_NOISE_VALUES`
-            observation_diff = predicted_distance - measured_distance
 
-            # Check if the difference is within the possible range of noise values
-            if observation_diff <= max(SONAR_NOISE_VALUES):
-                # Count how many noise values can align the prediction with the actual observation
-                # this can be one of:
-                # - 0 (difference is not within plausible range of noise values)
-                # - 1 (noise is 0)
-                # - 2 (noise is +x or -x, x > 0)
-                valid_noise_values = np.sum(np.abs(SONAR_NOISE_VALUES) >= observation_diff)
-                # Assign weight proportional to the number of valid noise values
-                self.weights[i] = valid_noise_values / SONAR_NOISE_RANGE
-            else:
-                # If the difference is too large (i.e. can't be explained by the sonar noise),
-                #  the weight for this particle is zero
-                self.weights[i] = 0
-        
-        # Normalize the weights so it's a probability distribution (will be used to resample particles)
-        if sum(self.weights) == 0:
-            self.weights += 1.e-300  # avoid divide by zero
-        self.weights /= sum(self.weights)
-        
-    def __resample_particles(self):
-       """
-       Resample particles based on their weights.
-       """
-       # multinomial resample (with replacement) based on weights
-       #indices = np.random.choice(np.arange(self.num_particles), size=self.num_particles, p=self.weights)
-       indices = systematic_resample(self.weights)
-       # TODO use systematic resample instead of multinomial resample
-       self.particles = self.particles[indices]
-       self.velocities = self.velocities[indices]
-
-    # TODO continue here
+    # TODO continue here (but need to rewrite this bc noisy position estimates is now prob distr)
     def __generate_recent_random_particles(self, num_particles):
         """
         Generate random particles with a preference for positions closer to recent noisy estimates.
         """
         recent_random_particles = []
-        num_estimates = len(self.recent_noisy_estimates)
+        num_estimates = len(self.noisy_position_distributions)
 
         # Create a probability distribution based on proximity to noisy estimates
         probabilities = np.zeros(len(self.legal_positions))
-        for index, noisy_estimate in enumerate(self.recent_noisy_estimates):
+        for index, noisy_estimate in enumerate(self.noisy_position_distributions):
             for i, pos in enumerate(self.legal_positions):
                 distance = np.sum(np.abs(pos - self.agent_position))
                 if distance == noisy_estimate:
@@ -490,7 +601,7 @@ class ReflexCaptureAgent(CaptureAgent):
                 pf.update_with_exact_position(exact_pos)
             # if enemy agent is not seen directly, update particle filter with noisy distance
             else:
-                pf.update_with_noisy_distance(noisy_distances[enemy_index], agent_position)
+                pf.update_with_noisy_distance(agent_position, noisy_distances[enemy_index])
 
 
     def choose_action(self, game_state):
