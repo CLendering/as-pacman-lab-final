@@ -149,7 +149,9 @@ class EnemyPositionParticleFilter:
         current_particles_counter = Counter()
         for pos in self.particles:
             current_particles_counter[tuple(pos)] += 1
-        self.logger.info(f'Current particle positions: {current_particles_counter}')
+        
+        sorted_particle_positions = sorted(current_particles_counter.items(), key=lambda x: x[1], reverse=True)
+        self.logger.info(f'Current top 10 particle positions: {dict(sorted_particle_positions[:10])}')
 
 
         SPEED = 1.0 # TODO change if enemy is scared. needs to be reset if scared ghost is eaten. also, use normal speed when scared but on the pacman side.
@@ -205,7 +207,9 @@ class EnemyPositionParticleFilter:
         new_particles_counter = Counter()
         for pos in self.particles:
             new_particles_counter[tuple(pos)] += 1
-        self.logger.info(f'New particle positions: {new_particles_counter}')
+
+        new_sorted_particle_positions = sorted(new_particles_counter.items(), key=lambda x: x[1], reverse=True)
+        self.logger.info(f'New particle positions: {dict(new_sorted_particle_positions[:10])}')
     
     # TODO call update_with_exact_position with enemy spawn when killing an enemy
     def update_with_exact_position(self, position):
@@ -224,6 +228,12 @@ class EnemyPositionParticleFilter:
         for i in range(len(self.noisy_position_distributions)):
             self.noisy_position_distributions[i] = np.copy(position_distribution)
 
+    def reset_to_spawn(self):
+        """
+        Call this when an enemy has been killed to reset 
+        the particles and position distributions to their initial position.
+        """
+        self.update_with_exact_position(self.spawn_position)
 
     def update_with_noisy_distance(self, agent_position, noisy_distance):
         """
@@ -242,7 +252,7 @@ class EnemyPositionParticleFilter:
         """
         Estimate the position as the mean of the particle distribution.
         """
-        mean_position = np.mean(self.particles, axis=0)
+        mean_position = np.rint(np.mean(self.particles, axis=0)).astype(int)
         # Check if mean position is valid
         if self.__is_valid(mean_position):
             return mean_position
@@ -251,7 +261,7 @@ class EnemyPositionParticleFilter:
         distances = np.linalg.norm(self.particles - mean_position, ord=1, axis=1)
         min_distance = np.min(distances)
         nearest_particles = self.particles[distances == min_distance]
-        mean_position = np.mean(nearest_particles, axis=0)
+        mean_position = np.rint(np.mean(nearest_particles, axis=0)).astype(int)
 
         # Check if mean position is valid now
         if self.__is_valid(mean_position):
@@ -259,8 +269,10 @@ class EnemyPositionParticleFilter:
         
         # mean position is still not valid - just chose a random particle for now.
         # TODO save last estimates and in this case pick the particle closest to last estimates
-        mean_position = np.random.choice(nearest_particles)
-        return mean_position
+        nearest_position = np.rint(nearest_particles[np.random.choice(len(nearest_particles),1)]).astype(int)[0]
+        if self.walls[nearest_position[0]][nearest_position[1]]:
+            raise "WTF"
+        return nearest_position
 
 
     def __update_noisy_position_distributions(self, agent_position, noisy_distance):
@@ -333,13 +345,22 @@ class EnemyPositionParticleFilter:
         """
         Update all probability distributions such that positions within SIGHT_RANGE of agent_position are set to zero.
         """
+
+
         for distribution in self.noisy_position_distributions:
+            changed = []
+            old = []
             for x in range(self.walls.width):
                 for y in range(self.walls.height):
                     if self.__within_sight_range(agent_position, (x, y)):
+                        old.append(distribution[x,y])
+                        changed.append((x,y))
                         distribution[x, y] = 0
             # normalize 
-            distribution /= distribution.sum()
+            if distribution.sum() > 0:
+                distribution /= distribution.sum()
+            else:
+                print('oo')
 
     def __within_sight_range(self, agent_pos, pos):
         """
@@ -364,7 +385,8 @@ class EnemyPositionParticleFilter:
         Weigh particles based on the condensed position distribution.
         """
         int_particles = np.rint(self.particles).astype(int)
-        self.weights[:] = condensed_position_distribution[int_particles[:,0], int_particles[:,1]]
+        self.weights[:] *= condensed_position_distribution[int_particles[:,0], int_particles[:,1]]
+        self.weights /= self.weights.sum()
 
         
     def __resample_particles(self, condensed_position_distribution):
@@ -382,6 +404,7 @@ class EnemyPositionParticleFilter:
         indices = systematic_resample(self.weights, num_resampled_particles)
         self.particles[:num_resampled_particles] = self.particles[indices]
         self.velocities[:num_resampled_particles] = self.velocities[indices]
+        self.weights[:num_resampled_particles] = self.weights[indices]
  
         # Add random particles
         # TODO try constraining random particles to be near to 
@@ -390,7 +413,7 @@ class EnemyPositionParticleFilter:
         random_indices = np.random.choice(np.arange(len(flat_distribution)), size=num_random_particles, p=flat_distribution)
         self.particles[num_resampled_particles:] = np.array(np.unravel_index(random_indices, condensed_position_distribution.shape)).T
         self.velocities[num_resampled_particles:] = self.__generate_random_velocities(num_random_particles)
- 
+        self.weights[num_resampled_particles:] = flat_distribution[random_indices]
 
     def __generate_random_velocities(self, num_random_particles):
         # TODO implement
@@ -404,9 +427,8 @@ class EnemyPositionParticleFilter:
         """
         Checks if position is valid for an agent (i.e. it is not inside a wall).
         """
-        x, y = position
-        x_int, y_int = int(x + 0.5), int(y + 0.5)
-        return not self.walls[x_int][y_int]
+        x, y = np.rint(position).astype(int)
+        return not self.walls[x][y]
     
     def __get_adjacent_cells(self, x, y):
         """
@@ -574,7 +596,7 @@ class ReflexCaptureAgent(CaptureAgent):
         global enemyPositionParticleFilters
         if not enemyPositionParticleFilters:
             for enemy in self.get_opponents(game_state):
-                enemyPositionParticleFilters[enemy] = EnemyPositionParticleFilter(num_particles=1000, 
+                enemyPositionParticleFilters[enemy] = EnemyPositionParticleFilter(num_particles=500, 
                                                walls=game_state.get_walls(), 
                                                initial_position=game_state.get_agent_position(enemy),
                                                tracked_enemy_index=enemy) 
@@ -616,6 +638,9 @@ class ReflexCaptureAgent(CaptureAgent):
             if exact_pos is not None:
                 self.logger.info(f'Got exact position of enemy {enemy_index} at {exact_pos}!')
                 pf.update_with_exact_position(exact_pos)
+                
+                # TODO update with exact position spawn when killing enemy
+                #if GhostRules.canKill()
             # if enemy agent is not seen directly, update particle filter with noisy distance
             else:
                 pf.update_with_noisy_distance(agent_position, noisy_distances[enemy_index])
@@ -683,6 +708,8 @@ class ReflexCaptureAgent(CaptureAgent):
 
         food_left = len(self.get_food(game_state).as_list())
 
+        chosen_action = None
+        
         if food_left <= 2:
             best_dist = 9999
             best_action = None
@@ -693,9 +720,19 @@ class ReflexCaptureAgent(CaptureAgent):
                 if dist < best_dist:
                     best_action = action
                     best_dist = dist
-            return best_action
+            chosen_action = best_action
+        else:
+            chosen_action = random.choice(best_actions)
+        
+        # Check if the chosen action results in eating an enemy
+        # in that case reset the enemy's position to their spawn
+        successor = self.get_successor(game_state, chosen_action)
+        for enemy in enemies:
+            if successor.data._eaten[enemy]:
+                enemyPositionParticleFilters[enemy].reset_to_spawn()
 
-        return random.choice(best_actions)
+        return chosen_action
+        
 
     def get_successor(self, game_state, action):
         """

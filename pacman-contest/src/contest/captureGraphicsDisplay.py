@@ -324,9 +324,9 @@ class PacmanGraphics:
         pass
 
     def animateEnemyPositionParticleFilters(self):
-        DRAW_PARTICLES = False
-        DRAW_CONDENSED_POSITION_DISTRIBUTION = True
-        
+        DRAW_PARTICLES = True
+        DRAW_CONDENSED_POSITION_DISTRIBUTION = not DRAW_PARTICLES
+
         for particle_filter_dict in [self.redEnemyPositionParticleFilters, self.blueEnemyPositionParticleFilters]:
             if particle_filter_dict is not None:
                 for enemy, particle_filter in particle_filter_dict.items():
