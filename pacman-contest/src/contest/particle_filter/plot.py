@@ -10,7 +10,9 @@ def extract_numbers(s):
 enemies = set()
 agents =set()
 
-def load_data_from_directory(directory_path):
+def load_data_from_directory(dirname):
+    directory_path = f'pacman-contest/src/contest/particle_filter/{dirname}'  # This would be the directory containing the log files
+
     # Dictionary to hold the data
     data = {
         'true_distances': {},
@@ -31,7 +33,7 @@ def load_data_from_directory(directory_path):
     for filename in os.listdir(directory_path):
         if not filename.endswith('log'):
             continue
-        
+
         file_path = os.path.join(directory_path, filename)
         
         with open(file_path, 'r') as file:
@@ -104,18 +106,21 @@ def plot_distances_for_agent(agent_index, data, axs):
         axs[i].grid(True)
 
         # Calculating and displaying stats
-        mse_estimated = ((true_distances[f"True Distance to Enemy {enemy}"] - estimated_distances[f"Estimated Distance to Enemy {enemy}"])**2).mean()
-        mse_noisy = ((true_distances[f"True Distance to Enemy {enemy}"] - noisy_distances[f"Noisy Distance to Enemy {enemy}"])**2).mean()
+        mse_estimated = ((true_distances[f"True Distance to Enemy 1"] - estimated_distances[f"Estimated Distance to Enemy 1"])**2).mean()
+        mse_noisy = ((true_distances[f"True Distance to Enemy 1"] - noisy_distances[f"Noisy Distance to Enemy 1"])**2).mean()
+        var_estimated_error = (true_distances[f"True Distance to Enemy 1"] - estimated_distances[f"Estimated Distance to Enemy 1"]).var()
+        var_noisy_error = (true_distances[f"True Distance to Enemy 1"] - noisy_distances[f"Noisy Distance to Enemy 1"]).var()
 
         stats_text = f"MSE (Estimated to True): {mse_estimated:.2f}\n" \
-                     f"MSE (Noisy to True): {mse_noisy:.2f}"
-
-        axs[i].text(0.2, 0.9, stats_text, horizontalalignment='center', verticalalignment='center', transform=axs[i].transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
+                f"MSE (Noisy to True): {mse_noisy:.2f}\n" \
+                f"Variance (Estimated to True): {var_estimated_error:.2f}\n" \
+                f"Variance (Noisy to True): {var_noisy_error:.2f}"
+        
+        axs[i].text(0.2, 0.85, stats_text, horizontalalignment='center', verticalalignment='center', transform=axs[i].transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
 
 
 def plot_distance_evaluations(dirname):
-    data_directory = f'pacman-contest/src/contest/particle_filter/{dirname}'  # This would be the directory containing the log files
-    data = load_data_from_directory(data_directory)
+    data = load_data_from_directory(dirname)
 
 
 
@@ -127,4 +132,20 @@ def plot_distance_evaluations(dirname):
     plt.show()
 
 
-plot_distance_evaluations('baseline')
+
+def print_mean_manhattan_distance_error(dirname):
+    data = load_data_from_directory(dirname)
+    for enemy in sorted(enemies):
+        mean_manhattan_distance_error = (data['true_positions'][enemy] - data['estimated_positions'][enemy]).abs().sum(axis=1).mean()
+        print(f'Mean Manhattan Distance Error for Enemy {enemy}: {mean_manhattan_distance_error:.2f}')
+
+dirname = 'baseline'
+
+
+print_mean_manhattan_distance_error(dirname)
+plot_distance_evaluations(dirname)
+
+
+# TODO add table which has mean_manhattan_distance_error / mse / var
+# as well as other stats which are currently in the plots
+# table should be in last row and span all columns
