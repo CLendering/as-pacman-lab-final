@@ -32,6 +32,30 @@
             ]
         },
         {
+            "name": "Plot Particle Filter",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/particle_filter/plot.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "[short, quiet] Pacman Contest with Particle Filter Team",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+                "-r",
+                "agents/team_with_filter/particleFilterTeam",
+                "-q",
+                "-i",
+                "20"
+            ]
+        },
+        {
             "name": "Keyboard Agent",
             "type": "python",
             "request": "launch",

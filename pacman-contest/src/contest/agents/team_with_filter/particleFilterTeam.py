@@ -29,8 +29,54 @@ from contest.pacman import GhostRules
 import numpy as np
 from collections import deque
 import logging
+import os
 
 # ---- Logging ----
+def createEmptyLogDir(baseDir):
+    if not os.path.exists(baseDir):
+        os.makedirs(baseDir)
+
+    if not os.listdir(baseDir):  # Check if directory is empty
+        return baseDir
+
+    # Find the next available directory name
+    counter = 1
+    while True:
+        new_dir = os.path.join(baseDir, f'{counter:02d}')
+        if not os.path.exists(new_dir):
+            os.makedirs(new_dir)
+            break
+        counter += 1
+
+    return new_dir
+
+logDir = createEmptyLogDir('particle_filter')
+
+def getLogFilePath(filename):
+    return os.path.join(logDir, filename)
+
+
+
+
+
+class DeferredFileHandler(logging.Handler):
+    def __init__(self, name, formatter=logging.Formatter('%(message)s')):
+        super().__init__()
+        self.setFormatter(formatter)
+        self.setLevel(logging.DEBUG)
+        self.name = name
+        self.buffer = []
+
+    def emit(self, record):
+        self.buffer.append(self.format(record))
+
+    def flush(self):
+        with open(f'{self.name}.log', 'a') as f:
+            f.write('\n'.join(self.buffer) + '\n')
+        self.buffer = []
+
+
+
 console_log_handler = logging.StreamHandler()  # Console handler
 file_log_handler = logging.FileHandler('particleFilterTeam.log')  # File handler
 console_log_handler.setLevel(logging.INFO)
@@ -105,7 +151,7 @@ class EnemyPositionParticleFilter:
     # TODO maybe I need to add some noise to some other part here?
     def __init__(self, num_particles, walls, initial_position, tracked_enemy_index, max_noisy_estimates=10):
         self.logger = logging.getLogger(f'EnemyPositionParticleFilter (enemy {tracked_enemy_index})')
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.WARNING)
         self.logger.addHandler(console_log_handler)
 
         # Distributions based on noisy measurements, not actual particle positions
@@ -138,6 +184,20 @@ class EnemyPositionParticleFilter:
             # Randomly select non-zero velocities for particles
             indices = np.random.choice(len(legal_velocities), size=num_particles)
             self.velocities =  legal_velocities[indices]
+
+
+        self.estimated_positions_logger = logging.getLogger(f'estimated positions enemy {tracked_enemy_index})')
+        self.estimated_positions_logger.addHandler(DeferredFileHandler(getLogFilePath(f'estimated_positions_enemy_{tracked_enemy_index}')))
+        self.estimated_positions_logger.setLevel(logging.DEBUG)
+
+        self.true_positions_logger = logging.getLogger(f'true positions enemy {tracked_enemy_index})')
+        self.true_positions_logger.addHandler(DeferredFileHandler(getLogFilePath(f'true_positions_enemy_{tracked_enemy_index}')))
+        self.true_positions_logger.setLevel(logging.DEBUG)
+
+    def writeLogFiles(self):
+        for handler in [*self.estimated_positions_logger.handlers, *self.true_positions_logger.handlers]:
+            if type(handler) is DeferredFileHandler:
+                handler.flush()
 
 
     def move_particles(self):
@@ -255,7 +315,7 @@ class EnemyPositionParticleFilter:
         mean_position = np.rint(np.mean(self.particles, axis=0)).astype(int)
         # Check if mean position is valid
         if self.__is_valid(mean_position):
-            return mean_position
+            return tuple(mean_position)
         
         # Find the average of the nearest valid particles to the mean position
         distances = np.linalg.norm(self.particles - mean_position, ord=1, axis=1)
@@ -265,14 +325,14 @@ class EnemyPositionParticleFilter:
 
         # Check if mean position is valid now
         if self.__is_valid(mean_position):
-            return mean_position
+            return tuple(mean_position)
         
         # mean position is still not valid - just chose a random particle for now.
         # TODO save last estimates and in this case pick the particle closest to last estimates
         nearest_position = np.rint(nearest_particles[np.random.choice(len(nearest_particles),1)]).astype(int)[0]
         if self.walls[nearest_position[0]][nearest_position[1]]:
             raise "WTF"
-        return nearest_position
+        return tuple(nearest_position)
 
 
     def __update_noisy_position_distributions(self, agent_position, noisy_distance):
@@ -298,6 +358,7 @@ class EnemyPositionParticleFilter:
         # Each agent (enemy or friendly) moves once every four turns. They can move at most 1 grid cell per turn. The particle filters for every enemy is updated every two turns. So every time a particle filter is updated, the enemy moves on average by +-0.5  (because it can move by 1 every four turns and the particle filters are updated every two turns). The same goes for the measuring agent. So the true distance of a measuring agent to every enemy can change by |+-0.5|+|+-0.5|=1 every two turns. The position of an enemy agent can change by one of the vectors in [(-0.5, 0), (0, -0.5), (0, 0), (0.5, 0), (0,0.5)] every two turns. 
         # Remember that The position of an enemy agent can change by one of the vectors in [(-0.5, 0), (0, -0.5), (0, 0), (0.5, 0), (0,0.5)] every two turns when the particle filters are being updated.
 
+        # TODO do this next
         # TODO I'm not sure if this is the best idea, probabilities might oscillate back and forth
         # to mitigate this I'd have to add some temporal/directional memory 
 
@@ -531,20 +592,6 @@ def create_team(first_index, second_index, is_red,
 # Agents #
 ##########
 
-
-history_enemy_position_estimates = []
-history_DEBUG_actual_enemy_positions = []
-history_enemy_distance_estimates = []
-history_DEBUG_actual_enemy_distances = []
-history_noisy_distances = []
-
-pf_estimated_positions_f = open('particle_filter/estimated_positions.log', 'w')
-pf_estimated_distances_f = open('particle_filter/estimated_distances.log', 'w')
-true_positions_f = open('particle_filter/true_positions.log', 'w')
-true_distances_f = open('particle_filter/true_distances.log', 'w')
-noisy_distances_f = open('particle_filter/noisy_distances.log', 'w')
-
-
 class ReflexCaptureAgent(CaptureAgent):
     """
     A base class for reflex agents that choose score-maximizing actions
@@ -555,37 +602,27 @@ class ReflexCaptureAgent(CaptureAgent):
         self.start = None
 
         self.logger = logging.getLogger(f'Agent {self.index})')
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.WARNING)
         self.logger.addHandler(console_log_handler)
     
 
-    def __del__(self):
-        if self.index == max(self.agentsOnTeam):
-            s_pf_estimated_positions_f = ''
-            s_true_positions_f = ''
-            s_pf_estimated_distances_f = ''
-            s_true_distances_f = ''
-            s_noisy_distances_f = ''
-            for i in range(len(history_enemy_position_estimates)):
-                s_pf_estimated_positions_f += f'{tuple(history_enemy_position_estimates[i][0])} {tuple(history_enemy_position_estimates[i][1])}\n'
-                s_true_positions_f += f'{history_DEBUG_actual_enemy_positions[i][0]} {history_DEBUG_actual_enemy_positions[i][1]}\n'
-                s_pf_estimated_distances_f += f'{history_enemy_distance_estimates[i][0]} {history_enemy_distance_estimates[i][1]}\n'
-                s_true_distances_f += f'{history_DEBUG_actual_enemy_distances[i][0]} {history_DEBUG_actual_enemy_distances[i][0]}\n'
-                s_noisy_distances_f += f'{history_noisy_distances[i][0]} {history_noisy_distances[i][1]}\n'
+        self.estimated_distances_logger = logging.getLogger(f'estimated distances {self.index}')
+        self.estimated_distances_logger.addHandler(DeferredFileHandler(getLogFilePath(f'estimated_distances_agent_{self.index}')))
+        self.estimated_distances_logger.setLevel(logging.DEBUG)
 
-            pf_estimated_positions_f.write(s_pf_estimated_positions_f)
-            true_positions_f.write(s_true_positions_f)
-            pf_estimated_distances_f.write(s_pf_estimated_distances_f)
-            true_distances_f.write(s_true_distances_f)
-            noisy_distances_f.write(s_noisy_distances_f)
+        self.true_distances_logger = logging.getLogger(f'true distances {self.index}')
+        self.true_distances_logger.addHandler(DeferredFileHandler(getLogFilePath(f'true_distances_{self.index}')))
+        self.true_distances_logger.setLevel(logging.DEBUG)
+
+        self.noisy_distances_logger = logging.getLogger(f'noisy distances {self.index}')
+        self.noisy_distances_logger.addHandler(DeferredFileHandler(getLogFilePath(f'noisy_distances_{self.index}')))
+        self.noisy_distances_logger.setLevel(logging.DEBUG)
 
 
-        pf_estimated_positions_f.close()
-        pf_estimated_distances_f.close()
-        true_positions_f.close()
-        true_distances_f.close()
-        noisy_distances_f.close()
-
+    def writeLogFiles(self):
+        for handler in [*self.estimated_distances_logger.handlers, *self.true_distances_logger.handlers, *self.noisy_distances_logger.handlers]:
+            if type(handler) is DeferredFileHandler:
+                handler.flush()
 
 
     def register_initial_state(self, game_state):
@@ -600,7 +637,6 @@ class ReflexCaptureAgent(CaptureAgent):
                                                walls=game_state.get_walls(), 
                                                initial_position=game_state.get_agent_position(enemy),
                                                tracked_enemy_index=enemy) 
-        self.finishedFirstMove = False
         
     def get_exact_opponent_distances(self, game_state): 
         agent_pos = game_state.get_agent_position(self.index)
@@ -644,6 +680,9 @@ class ReflexCaptureAgent(CaptureAgent):
             # if enemy agent is not seen directly, update particle filter with noisy distance
             else:
                 pf.update_with_noisy_distance(agent_position, noisy_distances[enemy_index])
+            
+            # Logging
+            # TODO
 
 
     def choose_action(self, game_state):
@@ -673,29 +712,19 @@ class ReflexCaptureAgent(CaptureAgent):
         enemy_position_estimates = [enemyPositionParticleFilters[enemy].estimate_position() for enemy in sorted(enemyPositionParticleFilters.keys())]
         enemy_distance_estimates = [manhattanDistance(agent_position, enemy_pos) for enemy_pos in enemy_position_estimates]
 
-        self.finishedFirstMove = True
-        DEBUG_actual_enemy_positions = game_state.DEBUG_actual_enemy_positions
 
-        # TODO hier sind paar sachen ganz komisch.
-        # ich glaub beim setzen von DEBUG_actual_enemy_distances geht was schief
-        # z.b. in der aktuellen datei bei row 100 schwingen die werte zu sehr rum das geht gar nich
-        # die estimated und noisy schwingen auch extrem ka was da los is
 
+        # TODO delete this game_state.DEBUG_... stuff (just for evaluating the filter)
         # just for evaluating the filter: get the actual positions of the enemies
-        DEBUG_actual_enemy_distances = game_state.DEBUG_actual_enemy_distances
-
-
-
-
-        history_enemy_position_estimates.append(enemy_position_estimates)
-        history_DEBUG_actual_enemy_positions.append(DEBUG_actual_enemy_positions)
-        history_enemy_distance_estimates.append(enemy_distance_estimates)
-        history_DEBUG_actual_enemy_distances.append(DEBUG_actual_enemy_distances)
-        history_noisy_distances.append(noisy_distances)
-
-
-        error_noisy_distances = np.array(DEBUG_actual_enemy_distances) - np.array(noisy_distances)
-        MSE_noisy_distances = (error_noisy_distances**2).mean()
+        # LOGGING
+        DEBUG_actual_enemy_positions = game_state.DEBUG_actual_enemy_positions
+        self.estimated_distances_logger.info(enemy_distance_estimates)
+        self.true_distances_logger.info(game_state.DEBUG_actual_enemy_distances)
+        self.noisy_distances_logger.info(noisy_distances)
+        for i, enemy in enumerate(sorted(enemyPositionParticleFilters.keys())):
+            pf = enemyPositionParticleFilters[enemy]
+            pf.estimated_positions_logger.info(enemy_position_estimates[i])
+            pf.true_positions_logger.info(DEBUG_actual_enemy_positions[i])
 
 
         # You can profile your evaluation time by uncommenting these lines
@@ -730,6 +759,17 @@ class ReflexCaptureAgent(CaptureAgent):
         for enemy in enemies:
             if successor.data._eaten[enemy]:
                 enemyPositionParticleFilters[enemy].reset_to_spawn()
+
+
+        # LOGGING
+        if game_state.data.timeleft < 4:
+            # last turn of agent: write own log files
+            self.writeLogFiles()
+            if game_state.data.timeleft < 2:
+            # last agent of team: flush particle filter logs
+                for pf in enemyPositionParticleFilters.values():
+                    pf.writeLogFiles()
+        
 
         return chosen_action
         
