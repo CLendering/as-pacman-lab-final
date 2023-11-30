@@ -13,7 +13,7 @@
                 "-b",
                 "pacman-contest\\src\\contest\\baselineTeam.py",
                 "--layout",
-                "pacman-contest\\src\\contest\\layouts\\jumboCapture"
+                "pacman-contest\\src\\contest\\layouts\\defaultCapture"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
