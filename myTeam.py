@@ -272,7 +272,9 @@ def aStarSearch(agent, goal, game_state, heuristic=dijk):
     agent_pos = game_state.get_agent_position(agent.index)
 
     # Calculate the heuristic value for the starting state
+    # time_heuristic = time.perf_counter()
     heuristic_val = heuristic(agent, goal, game_state)
+    # print("Heuristic time: ", time.perf_counter() - time_heuristic)
 
     # Push the starting state into the queue with its heuristic value and mark it as visited
     q.push(agent_pos, heuristic_val)
@@ -307,7 +309,9 @@ def aStarSearch(agent, goal, game_state, heuristic=dijk):
             path_cost = cur_path_cost + cost
 
             # Calculate the estimated total cost for the successor (path cost + heuristic)
+            # time_heuristic = time.perf_counter()
             total_cost = path_cost + heuristic(agent, goal, game_state)
+            # print("Heuristic time: ", time.perf_counter() - time_heuristic)
 
             # If the successor is already in the priority queue and has a higher estimated total cost
             if pos in in_queue:
@@ -421,7 +425,7 @@ class GoalPlannerOffensive(GoalPlanner):
             ]
 
             # If the agent can reach the power pellet before any ghost, then go for it
-            if ghost_distances_to_pellet and agent_distance_to_pellet < min(
+            if not ghost_distances_to_pellet or agent_distance_to_pellet < min(
                 ghost_distances_to_pellet
             ):
                 return closest_power_pellet
@@ -476,20 +480,6 @@ class GoalPlannerOffensive(GoalPlanner):
                     closest_opponent_ghost_index
                 ] <= GoalPlannerOffensive.MAX_SAFE_DISTANCE:
                     return center_of_our_side
-            else:
-                # If there are scared ghosts, then we should go for the scared ghosts
-                scared_ghost_positions = [
-                    game_state.get_agent_position(opponent)
-                    for opponent in scared_ghosts
-                    if game_state.get_agent_position(opponent)
-                ]
-                # If there are scared ghosts, then we should go for the scared ghosts
-                if len(scared_ghost_positions) > 0:
-                    closest_scared_ghost = min(
-                        scared_ghost_positions,
-                        key=lambda ghost: agent.get_maze_distance(agent_pos, ghost),
-                    )
-                    return closest_scared_ghost
 
         # get the food list
         if agent.red:
@@ -543,15 +533,17 @@ class OffensiveAStarAgent(CaptureAgent):
 
     # Implements A* and executes the plan
     def choose_action(self, game_state):
-        print(game_state)
-
+        # start_goal_calc = time.perf_counter()
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
+        # print("Goal calc time: ", time.perf_counter() - start_goal_calc)
+        # start_plan_calc = time.perf_counter()
         self.plan = aStarSearch(
             agent=self,
             goal=self.goal,
             game_state=game_state,
             heuristic=self.offensive_heuristic,
         )
+        # print("Plan calc time: ", time.perf_counter() - start_plan_calc)
 
         actions = game_state.get_legal_actions(self.index)
 
@@ -585,20 +577,28 @@ class OffensiveAStarAgent(CaptureAgent):
         POWER_PELLET_WEIGHT = 0.5  # Reward for approaching a power pellet
         FOOD_DENSITY_WEIGHT = 0.2  # Reward for being in a region with a lot of food
         SEARCH_RADIUS = 5  # Radius to search for food
-        SCARED_GHOST_REWARD = 10  # Reward for approaching a scared ghost
+        SCARED_GHOST_REWARD = 2  # Reward for approaching a scared ghost
 
         heuristic = 0
 
+        # profiling_dict = {}
+
         # get the index of opponent team members
+        # time_get_opponent_team_members = time.perf_counter()
         opponent_team_members = agent.get_opponents(game_state)
 
+        # profiling_dict["time_get_opponent_team_members"] = time.perf_counter() - time_get_opponent_team_members
+
         # get the absolute value of the noisy estimate of ghost distance
+        # time_get_noisy_ghost_distances = time.perf_counter()
         distances = game_state.agent_distances
+        # profiling_dict["time_get_noisy_ghost_distances"] = time.perf_counter() - time_get_noisy_ghost_distances
 
         # opponent distances to agent
         opponent_ghost_distances = {}
         opponent_pacman_distances = {}
 
+        # time_get_opponent_ghost_distances = time.perf_counter()
         for opponent_team_member in opponent_team_members:
             # if the opponent is a ghost
             if game_state.get_agent_state(opponent_team_member).is_pacman == False:
@@ -609,19 +609,13 @@ class OffensiveAStarAgent(CaptureAgent):
                 opponent_pacman_distances[opponent_team_member] = distances[
                     opponent_team_member
                 ]
+        # profiling_dict["time_get_opponent_ghost_distances"] = time.perf_counter() - time_get_opponent_ghost_distances
 
+        # time_get_agent_pacman_and_sum_heuristic = time.perf_counter()
         if len(opponent_ghost_distances) > 0:
             # get the closest distance to an opponent
             closest_opponent_distance = min(opponent_ghost_distances.values())
-            # get the closest opponent index
-            closest_opponent_index = min(
-                opponent_ghost_distances, key=opponent_ghost_distances.get
-            )
-            if (
-                game_state.get_agent_state(agent.index).is_pacman
-                and not game_state.get_agent_state(closest_opponent_index).scared_timer
-                > 0
-            ):
+            if game_state.get_agent_state(agent.index).is_pacman:
                 heuristic += OPPONENT_GHOST_WEIGHT * closest_opponent_distance
 
         if len(opponent_pacman_distances) > 0:
@@ -632,8 +626,11 @@ class OffensiveAStarAgent(CaptureAgent):
             if game_state.get_agent_state(agent.index).is_pacman == False:
                 heuristic -= OPPONENT_PACMAN_WEIGHT * closest_pacman_distance
 
+        # profiling_dict["time_get_agent_pacman_and_sum_heuristic"] = time.perf_counter() - time_get_agent_pacman_and_sum_heuristic
+
         ## BONUS FOR POWER PELLETS ALONG THE PATH
 
+        #time_power_pellet_list = time.perf_counter()
         # get the power pellet list
         if agent.red:
             power_pellet_list = game_state.get_blue_capsules()
@@ -652,29 +649,12 @@ class OffensiveAStarAgent(CaptureAgent):
             )
             heuristic += POWER_PELLET_WEIGHT * min_power_pellet_distance
 
-        ## BONUS FOR REGIONS WITH A LOT OF FOOD PELLETS
+        # profiling_dict["time_power_pellet_list"] = time.perf_counter() - time_power_pellet_list
 
-        # get the agent position
         agent_pos = game_state.get_agent_position(agent.index)
 
-        # get the food list
-        food_list = (
-            game_state.get_red_food().as_list()
-            if not agent.red
-            else game_state.get_blue_food().as_list()
-        )
-
-        # Count the number of food pellets within the search radius
-        food_count = sum(
-            1
-            for food in food_list
-            if agent.get_maze_distance(agent_pos, food) <= SEARCH_RADIUS
-        )
-
-        # add the food count to the heuristic
-        heuristic -= FOOD_DENSITY_WEIGHT * food_count
-
         ## BONUS FOR ATTACKING A SCARED GHOST
+        # time_bonus_attack_scared_ghost = time.perf_counter()
 
         # Get scared ghosts and their positions
         scared_ghosts = {
@@ -700,6 +680,8 @@ class OffensiveAStarAgent(CaptureAgent):
                 distance_to_scared_ghost + 1
             )  # Add 1 to avoid division by zero
 
+        # profiling_dict["time_bonus_attack_scared_ghost"] = time.perf_counter() - time_bonus_attack_scared_ghost
+        
         return heuristic
 
 
