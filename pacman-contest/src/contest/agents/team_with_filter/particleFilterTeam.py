@@ -619,6 +619,9 @@ class ReflexCaptureAgent(CaptureAgent):
         self.noisy_distances_logger.setLevel(logging.DEBUG)
 
 
+        self.last_food_you_are_defending = None
+
+
     def writeLogFiles(self):
         for handler in [*self.estimated_distances_logger.handlers, *self.true_distances_logger.handlers, *self.noisy_distances_logger.handlers]:
             if type(handler) is DeferredFileHandler:
@@ -690,6 +693,45 @@ class ReflexCaptureAgent(CaptureAgent):
         Picks among the actions with the highest Q(s,a).
         """
         self.logger.info(f"Turn starts")
+
+
+
+        # bf=game_state.get_blue_food()
+        # rf=game_state.get_red_food()
+        # bc=game_state.get_blue_capsules()
+        # rc=game_state.get_red_capsules()
+        # c = game_state.get_capsules()
+        # hasfood= game_state.has_food(0,0)
+
+        # food= self.get_food(game_state)
+        # own_food = self.get_food_you_are_defending(game_state)
+        # capsules = self.get_capsules(game_state)
+        # own_capsules = self.get_capsules_you_are_defending(game_state)
+
+        # TODO: do same with capsules 
+
+        # TODO do this check in a class that is shared by both agents (so it can update the particle filters more frequently)
+        # and then update pf of enemy with closest position to missing food 
+        food_you_are_defending = self.get_food_you_are_defending(game_state)
+        if self.last_food_you_are_defending is not None:
+            if self.last_food_you_are_defending != food_you_are_defending:
+                enemy_positions = (np.array(self.last_food_you_are_defending.data) != np.array(food_you_are_defending.data)).nonzero()
+                # tuple with 2 elements
+                #   -> 1st element: np.array of x indices of food that is gone now
+                #   -> 2nd element: np.array of y indices of food that is gone now
+                # TODO LET'S GOOO HERE
+                for enemy in self.get_opponents(game_state):
+                    # TODO use information of how num_carrying for each enemy changes
+                    # to find out which enemy is at the position of the missing food :)
+                    # TODO: figure out direction of enemy as well from this lol
+                    # probably easiest by getting the closest direction from this vector:
+                    # (missing food position - last enemy position estimate)
+                    
+                    game_state.get_agent_state(index=enemy).num_carrying
+
+
+        self.last_food_you_are_defending = food_you_are_defending
+            
 
         actions = game_state.get_legal_actions(self.index)
         noisy_distances = self.get_noisy_opponent_distances(game_state)
@@ -770,7 +812,7 @@ class ReflexCaptureAgent(CaptureAgent):
                 for pf in enemyPositionParticleFilters.values():
                     pf.writeLogFiles()
         
-
+        return Directions.STOP
         return chosen_action
         
 
