@@ -805,7 +805,7 @@ def parse_agent_args(input_str):
     return opts
 
 
-def read_command(argv):
+def read_command(argv, grid_search):
     """Processes the command used to run pacman from the command line."""
     from optparse import OptionParser
 
@@ -1104,6 +1104,33 @@ def read_command(argv):
     # no_keyboard = parsed_options.textgraphics or parsed_options.quiet or parsed_options.num_training > 0
     print(f"\nRed team {parsed_options.red} with {red_args}:")
     red_agents = load_agents(True, parsed_options.red, red_args)
+
+    # LOAD OPTIMIZER PARAMETERS FOR OFFENSIVE A* AGENT
+    hyperparameters = grid_search
+
+    red_agents[0].OPPONENT_GHOST_WEIGHT = hyperparameters["OPPONENT_GHOST_WEIGHT"]
+    red_agents[0].OPPONENT_GHOST_WEIGHT_ATTENUATION = hyperparameters[
+        "OPPONENT_GHOST_WEIGHT_ATTENUATION"
+    ]
+    red_agents[0].OPPONENT_PACMAN_WEIGHT = hyperparameters["OPPONENT_PACMAN_WEIGHT"]
+    red_agents[0].OPPONENT_PACMAN_WEIGHT_ATTENUATION = hyperparameters[
+        "OPPONENT_PACMAN_WEIGHT_ATTENUATION"
+    ]
+    red_agents[0].POWER_PELLET_WEIGHT = hyperparameters["POWER_PELLET_WEIGHT"]
+    red_agents[0].POWER_PELLET_WEIGHT_ATTENUATION = hyperparameters[
+        "POWER_PELLET_WEIGHT_ATTENUATION"
+    ]
+    red_agents[0].SCARED_GHOST_REWARD = hyperparameters["SCARED_GHOST_REWARD"]
+    red_agents[0].SCARED_GHOST_DISTANCE_ATTENUATION = hyperparameters[
+        "SCARED_GHOST_DISTANCE_ATTENUATION"
+    ]
+    red_agents[0].GHOST_COLLISION_PENALTY = hyperparameters["GHOST_COLLISION_PENALTY"]
+    red_agents[0].GHOST_COLLISION_DISTANCE_ATTENUATION = hyperparameters[
+        "GHOST_COLLISION_DISTANCE_ATTENUATION"
+    ]
+    red_agents[0].EPSILON = hyperparameters["EPSILON"]
+
+
     print(f"\nBlue team {parsed_options.blue} with {blue_args}:")
     blue_agents = load_agents(False, parsed_options.blue, blue_args)
     args["agents"] = sum(
@@ -1434,7 +1461,7 @@ def compute_team_stats(games_data, team_name):
     ]
 
 
-def save_score(games, total_time, *, contest_name, match_id, **kwargs):
+def save_score(games, total_time, grid_search, *, contest_name, match_id, **kwargs):
     assert games
     sub_folder = f"www/contest_{contest_name}/scores"
     os.makedirs(name=sub_folder, exist_ok=True)
@@ -1458,6 +1485,7 @@ def save_score(games, total_time, *, contest_name, match_id, **kwargs):
         "max_steps": games[0].length,
         "teams_stats": teams_stats,
         "layouts": [game.state.data.layout.layout_name for game in games],
+        "grid_search": grid_search,
     }
 
     import json
@@ -1487,8 +1515,90 @@ def run(args):
         save_score(games=games, total_time=total_time, **options)
     print(f"\nTotal Time Game: {total_time}", file=sys.stdout)
 
+# Custom optimizer for agent parameters
+def run_optimizer(args):
+    # Grid Search for Offensive A* Agent
+    ## PENALTY FOR STATES WITH GHOSTS NEARBY
+    OPPONENT_GHOST_WEIGHT = [0.5, 1, 2, 4, 8, 10]
+    OPPONENT_GHOST_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+    OPPONENT_PACMAN_WEIGHT = [0.5, 1, 2, 4, 8, 10]
+    OPPONENT_PACMAN_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+    POWER_PELLET_WEIGHT = [0.5, 1, 2, 4, 8, 10]
+    POWER_PELLET_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+    SCARED_GHOST_REWARD = [0.5, 1, 2, 4, 8, 10]
+    SCARED_GHOST_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+    GHOST_COLLISION_PENALTY = [0.5, 1, 2, 4, 8, 10]
+    GHOST_COLLISION_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+    EPSILON = [0.1, 0.2, 0.3, 0.4, 0.5]
+
+    grid_search = {
+        "OPPONENT_GHOST_WEIGHT": 0,
+        "OPPONENT_GHOST_WEIGHT_ATTENUATION": 0,
+        "OPPONENT_PACMAN_WEIGHT": 0,
+        "OPPONENT_PACMAN_WEIGHT_ATTENUATION": 0,
+        "POWER_PELLET_WEIGHT": 0,
+        "POWER_PELLET_WEIGHT_ATTENUATION": 0,
+        "SCARED_GHOST_REWARD": 0,
+        "SCARED_GHOST_DISTANCE_ATTENUATION": 0,
+        "GHOST_COLLISION_PENALTY": 0,
+        "GHOST_COLLISION_DISTANCE_ATTENUATION": 0,
+        "EPSILON": 0,
+    }
+
+    # Args for --super-quiet and num_games
+    args_append = ["--super-quiet", "--numGames", "1"]
+    args.extend(args_append)
+
+    # Iterate over all combinations of parameters
+    for opponent_ghost_weight in OPPONENT_GHOST_WEIGHT:
+        for opponent_ghost_weight_attenuation in OPPONENT_GHOST_WEIGHT_ATTENUATION:
+            for opponent_pacman_weight in OPPONENT_PACMAN_WEIGHT:
+                for opponent_pacman_weight_attenuation in OPPONENT_PACMAN_WEIGHT_ATTENUATION:
+                    for power_pellet_weight in POWER_PELLET_WEIGHT:
+                        for power_pellet_weight_attenuation in POWER_PELLET_WEIGHT_ATTENUATION:
+                            for scared_ghost_reward in SCARED_GHOST_REWARD:
+                                for scared_ghost_distance_attenuation in SCARED_GHOST_DISTANCE_ATTENUATION:
+                                    for ghost_collision_penalty in GHOST_COLLISION_PENALTY:
+                                        for ghost_collision_distance_attenuation in GHOST_COLLISION_DISTANCE_ATTENUATION:
+                                            for epsilon in EPSILON:
+                                                # Set parameters
+                                                grid_search["OPPONENT_GHOST_WEIGHT"] = opponent_ghost_weight
+                                                grid_search["OPPONENT_GHOST_WEIGHT_ATTENUATION"] = opponent_ghost_weight_attenuation
+                                                grid_search["OPPONENT_PACMAN_WEIGHT"] = opponent_pacman_weight
+                                                grid_search["OPPONENT_PACMAN_WEIGHT_ATTENUATION"] = opponent_pacman_weight_attenuation
+                                                grid_search["POWER_PELLET_WEIGHT"] = power_pellet_weight
+                                                grid_search["POWER_PELLET_WEIGHT_ATTENUATION"] = power_pellet_weight_attenuation
+                                                grid_search["SCARED_GHOST_REWARD"] = scared_ghost_reward
+                                                grid_search["SCARED_GHOST_DISTANCE_ATTENUATION"] = scared_ghost_distance_attenuation
+                                                grid_search["GHOST_COLLISION_PENALTY"] = ghost_collision_penalty
+                                                grid_search["GHOST_COLLISION_DISTANCE_ATTENUATION"] = ghost_collision_distance_attenuation
+                                                grid_search["EPSILON"] = epsilon
+
+                                                # Run game
+                                                start_time = time.time()
+
+                                        
+                                                
+                                                options = read_command(args, grid_search=grid_search)  # Get game components based on input
+                                                print(options, file=sys.stdout)
+
+                                                games = run_games(**options)
+                                                total_time = round(time.time() - start_time, 0)
+
+                                                options["contest_name"] = "grid_search"
+
+                                                if games:
+                                                    # save_score(games=games, contest_name=options['contest_name'], match_id=options['match_id'])
+                                                    save_score(games=games, total_time=total_time, grid_search=grid_search, **options)
+                                                print(f"\nTotal Time Game: {total_time}", file=sys.stdout)
+
+        
+    
+    pass
+
+
 def main():
-    run(sys.argv[1:])
+    run_optimizer(sys.argv[1:])
 
 
 if __name__ == "__main__":

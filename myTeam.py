@@ -570,6 +570,18 @@ class OffensiveAStarAgent(CaptureAgent):
         self, index, time_for_computing=0.1, action_planner=GoalPlannerOffensive
     ):
         super().__init__(index, time_for_computing)
+        ## PENALTY FOR STATES WITH GHOSTS NEARBY
+        self.OPPONENT_GHOST_WEIGHT = 4  # Reward for approaching an opponent ghost
+        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.5 # Attenuation factor for the reward based on distance to the opponent ghost
+        self.OPPONENT_PACMAN_WEIGHT = 4  # Reward for approaching an opponent pacman
+        self.OPPONENT_PACMAN_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the opponent pacman
+        self.POWER_PELLET_WEIGHT = 0.5  # Reward for approaching a power pellet
+        self.POWER_PELLET_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the power pellet
+        self.SCARED_GHOST_REWARD = 8  # Reward for approaching a scared ghost
+        self.SCARED_GHOST_DISTANCE_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the scared ghost
+        self.GHOST_COLLISION_PENALTY = 20  # Penalty for states closer to a previously known ghost location
+        self.GHOST_COLLISION_DISTANCE_ATTENUATION = 0.2  # Attenuation factor for the penalty based on distance to the previously known ghost location
+        self.EPSILON = 0.001  # Small value to avoid division by zero
         self.start = None
         self.goal = None
         self.plan = None
@@ -622,18 +634,6 @@ class OffensiveAStarAgent(CaptureAgent):
     # Bonus for power pellets along the path
     # Bonus for regions with a lot of food pellets
     def offensive_heuristic(self, agent, goal, game_state):
-        ## PENALTY FOR STATES WITH GHOSTS NEARBY
-        OPPONENT_GHOST_WEIGHT = 4  # Reward for approaching an opponent ghost
-        OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.5 # Attenuation factor for the reward based on distance to the opponent ghost
-        OPPONENT_PACMAN_WEIGHT = 4  # Reward for approaching an opponent pacman
-        OPPONENT_PACMAN_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the opponent pacman
-        POWER_PELLET_WEIGHT = 0.5  # Reward for approaching a power pellet
-        POWER_PELLET_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the power pellet
-        SCARED_GHOST_REWARD = 8  # Reward for approaching a scared ghost
-        SCARED_GHOST_DISTANCE_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the scared ghost
-        GHOST_COLLISION_PENALTY = 20  # Penalty for states closer to a previously known ghost location
-        GHOST_COLLISION_DISTANCE_ATTENUATION = 0.2  # Attenuation factor for the penalty based on distance to the previously known ghost location
-        EPSILON = 0.001  # Small value to avoid division by zero
 
         heuristic = 0
 
@@ -677,8 +677,8 @@ class OffensiveAStarAgent(CaptureAgent):
             closest_opponent_distance = min(opponent_ghost_distances.values())
             closest_opponent_distance = max(closest_opponent_distance, 0)
             if agent_is_pacman:
-                heuristic += OPPONENT_GHOST_WEIGHT/ (closest_opponent_distance**OPPONENT_GHOST_WEIGHT_ATTENUATION + EPSILON)
-                heuristic_effect_dict["opponent_ghost"] = OPPONENT_GHOST_WEIGHT/ (closest_opponent_distance**OPPONENT_GHOST_WEIGHT_ATTENUATION + EPSILON)
+                heuristic += self.OPPONENT_GHOST_WEIGHT/ (closest_opponent_distance**self.OPPONENT_GHOST_WEIGHT_ATTENUATION + self.EPSILON)
+                heuristic_effect_dict["opponent_ghost"] = self.OPPONENT_GHOST_WEIGHT/ (closest_opponent_distance**self.OPPONENT_GHOST_WEIGHT_ATTENUATION + self.EPSILON)
         if len(opponent_pacman_distances) > 0:
             # get the closest distance to a pacman
             closest_pacman_distance = min(opponent_pacman_distances.values())
@@ -686,8 +686,8 @@ class OffensiveAStarAgent(CaptureAgent):
 
             # if the agent is a ghost
             if agent_is_pacman == False:
-                heuristic -= OPPONENT_PACMAN_WEIGHT / (closest_pacman_distance**OPPONENT_PACMAN_WEIGHT_ATTENUATION                                                       + EPSILON)
-                heuristic_effect_dict["opponent_pacman"] = OPPONENT_PACMAN_WEIGHT / (closest_pacman_distance**OPPONENT_PACMAN_WEIGHT_ATTENUATION                                                       + EPSILON)
+                heuristic -= self.OPPONENT_PACMAN_WEIGHT / (closest_pacman_distance**self.OPPONENT_PACMAN_WEIGHT_ATTENUATION + self.EPSILON)
+                heuristic_effect_dict["opponent_pacman"] = self.OPPONENT_PACMAN_WEIGHT / (closest_pacman_distance**self.OPPONENT_PACMAN_WEIGHT_ATTENUATION + self.EPSILON)
         # profiling_dict["time_get_agent_pacman_and_sum_heuristic"] = time.perf_counter() - time_get_agent_pacman_and_sum_heuristic
 
         ## BONUS FOR POWER PELLETS ALONG THE PATH
@@ -709,8 +709,8 @@ class OffensiveAStarAgent(CaptureAgent):
                     for power_pellet in power_pellet_list
                 ]
             )
-            heuristic -= POWER_PELLET_WEIGHT/ (min_power_pellet_distance**POWER_PELLET_WEIGHT_ATTENUATION + EPSILON)
-            heuristic_effect_dict["power_pellet"] = POWER_PELLET_WEIGHT/ (min_power_pellet_distance**POWER_PELLET_WEIGHT_ATTENUATION + EPSILON)
+            heuristic -= self.POWER_PELLET_WEIGHT/ (min_power_pellet_distance**self.POWER_PELLET_WEIGHT_ATTENUATION + self.EPSILON)
+            heuristic_effect_dict["power_pellet"] = self.POWER_PELLET_WEIGHT/ (min_power_pellet_distance**self.POWER_PELLET_WEIGHT_ATTENUATION + self.EPSILON)
         # profiling_dict["time_power_pellet_list"] = time.perf_counter() - time_power_pellet_list
 
         agent_pos = game_state.get_agent_position(agent.index)
@@ -738,11 +738,11 @@ class OffensiveAStarAgent(CaptureAgent):
             else:
                 distance_to_scared_ghost = 9999
             # Subtract from heuristic to reward being closer to the scared ghost
-            heuristic -= SCARED_GHOST_REWARD / (
-                distance_to_scared_ghost**SCARED_GHOST_DISTANCE_ATTENUATION + EPSILON
+            heuristic -= self.SCARED_GHOST_REWARD / (
+                distance_to_scared_ghost**self.SCARED_GHOST_DISTANCE_ATTENUATION + self.EPSILON
             )  # Add 1 to avoid division by zero
-            heuristic_effect_dict["scared_ghost"] = SCARED_GHOST_REWARD / (
-                distance_to_scared_ghost**SCARED_GHOST_DISTANCE_ATTENUATION + EPSILON
+            heuristic_effect_dict["scared_ghost"] = self.SCARED_GHOST_REWARD / (
+                distance_to_scared_ghost**self.SCARED_GHOST_DISTANCE_ATTENUATION + self.EPSILON
             )
 
         # profiling_dict["time_bonus_attack_scared_ghost"] = time.perf_counter() - time_bonus_attack_scared_ghost
@@ -754,8 +754,8 @@ class OffensiveAStarAgent(CaptureAgent):
             )
 
             if last_enemy_pos:
-                heuristic += GHOST_COLLISION_PENALTY / (agent.get_maze_distance(agent_pos, last_enemy_pos)**GHOST_COLLISION_DISTANCE_ATTENUATION + EPSILON)
-                heuristic_effect_dict["ghost_collision"] = GHOST_COLLISION_PENALTY / (agent.get_maze_distance(agent_pos, last_enemy_pos)**GHOST_COLLISION_DISTANCE_ATTENUATION + EPSILON)
+                heuristic += self.GHOST_COLLISION_PENALTY / (agent.get_maze_distance(agent_pos, last_enemy_pos)**self.GHOST_COLLISION_DISTANCE_ATTENUATION + self.EPSILON)
+                heuristic_effect_dict["ghost_collision"] = self.GHOST_COLLISION_PENALTY / (agent.get_maze_distance(agent_pos, last_enemy_pos)**self.GHOST_COLLISION_DISTANCE_ATTENUATION + self.EPSILON)
         return heuristic
 
 
