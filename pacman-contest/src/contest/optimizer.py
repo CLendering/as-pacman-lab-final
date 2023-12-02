@@ -50,6 +50,7 @@ Capture.py holds the logic for Pacman capture the flag.
 """
 import importlib.util
 import importlib.machinery
+import json
 import os
 import pathlib
 import random
@@ -1549,6 +1550,10 @@ def run_optimizer(args):
     args_append = ["--super-quiet", "--numGames", "1"]
     args.extend(args_append)
 
+    # Dict to store grid search results
+    grid_search_results = {}
+
+
     # Iterate over all combinations of parameters
     for opponent_ghost_weight in OPPONENT_GHOST_WEIGHT:
         for opponent_ghost_weight_attenuation in OPPONENT_GHOST_WEIGHT_ATTENUATION:
@@ -1588,13 +1593,61 @@ def run_optimizer(args):
                                                 options["contest_name"] = "grid_search"
 
                                                 if games:
-                                                    # save_score(games=games, contest_name=options['contest_name'], match_id=options['match_id'])
-                                                    save_score(games=games, total_time=total_time, grid_search=grid_search, **options)
-                                                print(f"\nTotal Time Game: {total_time}", file=sys.stdout)
+                                                    games_data = get_games_data(
+                                                        games=games,
+                                                        red_name=options["red_team_name"],
+                                                        blue_name=options["blue_team_name"],
+                                                        time_taken=total_time,
+                                                        match_id=options["match_id"],
+                                                    )
 
-        
+                                                    # Store results
+                                                    grid_search_results[str(grid_search)] = games_data
+
+
+                                                print(f"\nTotal Time Game: {total_time}", file=sys.stdout)
+    # Store results in JSON file
+    with open("grid_search_results.json", "w") as outfile:
+        json.dump(grid_search_results, outfile)
+
+    # Print best parameters based on average score
+    max_avg_score = 0
+    best_params = {}
+    for params in grid_search_results:
+        avg_score = 0
+        for game in grid_search_results[params]:
+            avg_score += game[3]
+        avg_score /= len(grid_search_results[params])
+        if avg_score > max_avg_score:
+            max_avg_score = avg_score
+            best_params = params
+
+    print(f"\nBest parameters: {best_params}")
+    print(f"Average score: {max_avg_score}")
+
+    # Store best parameters in JSON file
+    with open("best_params_AVGSCORE.json", "w") as outfile:
+        json.dump(best_params, outfile)
+
+    # Print best parameters based on win rate
+    max_win_rate = 0
+    best_params = {}
+    for params in grid_search_results:
+        win_rate = 0
+        for game in grid_search_results[params]:
+            if game[4] == "Red":
+                win_rate += 1
+        win_rate /= len(grid_search_results[params])
+        if win_rate > max_win_rate:
+            max_win_rate = win_rate
+            best_params = params
     
-    pass
+    print(f"\nBest parameters: {best_params}")
+    print(f"Win rate: {max_win_rate}")
+
+    # Store best parameters in JSON file
+    with open("best_params_WINRATE.json", "w") as outfile:
+        json.dump(best_params, outfile)
 
 
 def main():
