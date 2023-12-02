@@ -12,7 +12,7 @@
                 "-r",
                 "myTeam.py",
                 "-b",
-                "pacman-contest\\src\\contest\\baselineTeam.py",
+                "pacman-contest\\src\\contest\\customTeam.py",
                 "--layout",
                 "pacman-contest\\src\\contest\\layouts\\defaultCapture"
             ],
@@ -21,7 +21,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"
             },
-            "python": "C:\\Users\\camil\\anaconda3\\envs\\pacman\\python.exe"
+            "python": "C:\\Users\\berna\\anaconda3\\envs\\pacman-contest\\python.exe"
         },
     ]
 }
@@ -40,7 +40,7 @@
 //                 "-r",
 //                 "myTeam.py",
 //                 "-b",
-//                 "pacman-contest\\src\\contest\\baselineTeam.py",
+//                 "pacman-contest\\src\\contest\\customTeam.py",
 //                 "--layout",
 //                 "pacman-contest\\src\\contest\\layouts\\defaultCapture",
 //             ],

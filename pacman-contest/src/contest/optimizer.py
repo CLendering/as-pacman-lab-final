@@ -1530,7 +1530,7 @@ def run_optimizer(args):
     SCARED_GHOST_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
     GHOST_COLLISION_PENALTY = [0.5, 1, 2, 4, 8, 10]
     GHOST_COLLISION_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    EPSILON = [0.1, 0.2, 0.3, 0.4, 0.5]
+    EPSILON = [0.001]
 
     grid_search = {
         "OPPONENT_GHOST_WEIGHT": 0,

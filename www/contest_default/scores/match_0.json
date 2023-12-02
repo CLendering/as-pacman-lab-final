@@ -4,14 +4,14 @@
             "Red",
             "Blue",
             "pacman-contest\\src\\contest\\layouts\\defaultCapture.lay",
-            8,
+            12,
             "Red",
-            77.0,
+            188.0,
             0
         ]
     ],
     "layouts": [
-        "pacman-contest\\src\\contest\\layouts\\jumboCapture.lay"
+        "pacman-contest\\src\\contest\\layouts\\defaultCapture.lay"
     ],
     "max_steps": 1200,
     "teams_stats": {
@@ -31,7 +31,7 @@
             0,
             0,
             0,
-            8
+            12
         ]
     }
 }

@@ -38,7 +38,7 @@ def create_team(
     second_index,
     is_red,
     first="OffensiveReflexAgent",
-    second="OffensiveReflexAgent",
+    second="DefensiveReflexAgent",
     num_training=0,
 ):
     """
