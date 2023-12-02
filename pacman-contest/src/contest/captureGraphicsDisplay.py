@@ -321,11 +321,10 @@ class PacmanGraphics:
             self.infoPane.updateghost_distances(newState.ghost_distances)
 
         self.animateEnemyPositionParticleFilters()
-        pass
 
     def animateEnemyPositionParticleFilters(self):
-        DRAW_PARTICLES = True
-        DRAW_CONDENSED_POSITION_DISTRIBUTION = not DRAW_PARTICLES
+        DRAW_PARTICLES = False
+        DRAW_CONDENSED_POSITION_DISTRIBUTION = False#not DRAW_PARTICLES
 
         for particle_filter_dict in [self.redEnemyPositionParticleFilters, self.blueEnemyPositionParticleFilters]:
             if particle_filter_dict is not None:
@@ -372,24 +371,21 @@ class PacmanGraphics:
         # draw new particles
         position_distribution = particle_filter._EnemyPositionParticleFilter__get_condensed_position_distribution()
         enemy = particle_filter.tracked_enemy_index
-        min_prob = position_distribution.min()
         max_prob = position_distribution.max()
         MIN_SIZE = 0.05
         MAX_SIZE = 1
-        for x in range(particle_filter.walls.width):
-            for y in range(particle_filter.walls.height):
-                    prob = position_distribution[x, y]
-                    if prob == 0:
-                        continue
-                    
-                    screen_pos = self.to_screen((x, y))
-                    position_size = MIN_SIZE + (MAX_SIZE - MIN_SIZE) * ((prob/max_prob) ** 1/2)
-                    scaled_position_size = self.gridSize * position_size
-                    position_image = circle(screen_pos,
-                            scaled_position_size,
-                            outlineColor='#ffffff', fillColor=GHOST_COLORS[enemy],
-                            width=0.6 * scaled_position_size,style='chord')
-                    self.particleFilterImages[enemy].append(position_image)
+        nonzero_x, nonzero_y = position_distribution.nonzero()
+        for x, y in zip(nonzero_x, nonzero_y):
+                prob = position_distribution[x, y]
+                
+                screen_pos = self.to_screen((x, y))
+                position_size = MIN_SIZE + (MAX_SIZE - MIN_SIZE) * ((prob/max_prob) ** 1/2)
+                scaled_position_size = self.gridSize * position_size
+                position_image = circle(screen_pos,
+                        scaled_position_size,
+                        outlineColor='#ffffff', fillColor=GHOST_COLORS[enemy],
+                        width=0.6 * scaled_position_size,style='chord')
+                self.particleFilterImages[enemy].append(position_image)
         current_estimate = particle_filter.estimate_position()
         current_estimate_screen_pos = self.to_screen(current_estimate)
         current_estimate_marker = create_text(current_estimate_screen_pos, GHOST_COLORS[enemy], 'X', size=24, anchor='center')

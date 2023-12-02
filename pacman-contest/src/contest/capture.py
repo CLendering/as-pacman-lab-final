@@ -768,7 +768,7 @@ def read_command(argv):
     EXAMPLES:   (1) python capture.py
                     - starts a game with two baseline agents
                 (2) python capture.py --keys0
-                    - starts a two-player interactive game where the arrow keys control agent 0, and all other agents 
+                    - starts a two-player interactive game where the arrow keys cont<rol agent 0, and all other agents 
                     are baseline agents
                 (3) python capture.py -r baselineTeam -b myTeam
                     - starts a fully automated game where the red team is a baseline team and blue team is myTeam
