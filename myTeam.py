@@ -65,6 +65,19 @@ def bfs_until_non_wall(start, game_state):
     :param start: Tuple (x, y) representing the start coordinate.
     :return: List of tuples representing the path to the first non-wall position.
     """
+
+    # Correct start if its coordinates are negative
+    if start[0] < 0:
+        start = (0, start[1])
+    if start[1] < 0:
+        start = (start[0], 0)
+
+    # Correct start if its coordinates are greater than the width or height of the board
+    if start[0] > game_state.data.layout.width:
+        start = (game_state.data.layout.width, start[1])
+    if start[1] > game_state.data.layout.height:
+        start = (start[0], game_state.data.layout.height)
+        
     # Define movements: right, left, up, down
     movements = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
@@ -1143,6 +1156,7 @@ class GoalPlannerDefensive(GoalPlanner):
                                 closest_invader_pos[0],
                                 closest_invader_pos[1] - GoalPlannerDefensive.SAFE_DISTANCE,
                             )
+                        
 
                 return bfs_until_non_wall(closest_safe_position, game_state)[-1]
             
