@@ -4,7 +4,7 @@
 # educational purposes provided that (1) you do not distribute or publish
 # solutions, (2) you retain this notice, and (3) you provide clear
 # attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
-# 
+#
 # Attribution Information: The Pacman AI projects were developed at UC Berkeley.
 # The core projects and autograders were primarily created by John DeNero
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
@@ -20,8 +20,15 @@ from captureAgents import CaptureAgent
 # Team creation #
 #################
 
-def create_team(first_index, second_index, is_red,
-                first='DummyAgent', second='DummyAgent', num_training=0):
+
+def create_team(
+    first_index,
+    second_index,
+    is_red,
+    first="DummyAgent",
+    second="DummyAgent",
+    num_training=0,
+):
     """
     This function should return a list of two agents that will form the
     team, initialized using firstIndex and secondIndex as their agent
@@ -45,12 +52,13 @@ def create_team(first_index, second_index, is_red,
 # Agents #
 ##########
 
+
 class DummyAgent(CaptureAgent):
     """
-  A Dummy agent to serve as an example of the necessary agent structure.
-  You should look at baselineTeam.py for more details about how to
-  create an agent as this is the bare minimum.
-  """
+    A Dummy agent to serve as an example of the necessary agent structure.
+    You should look at baselineTeam.py for more details about how to
+    create an agent as this is the bare minimum.
+    """
 
     def register_initial_state(self, game_state):
         """
@@ -65,17 +73,17 @@ class DummyAgent(CaptureAgent):
         IMPORTANT: This method may run for at most 15 seconds.
         """
 
-        '''
+        """
         Make sure you do not delete the following line. If you would like to
         use Manhattan distances instead of maze distances in order to save
         on initialization time, please take a look at
         CaptureAgent.register_initial_state in captureAgents.py.
-        '''
+        """
         CaptureAgent.register_initial_state(self, game_state)
 
-        '''
+        """
         Your initialization code goes here, if you need any.
-        '''
+        """
 
     def choose_action(self, game_state):
         """
@@ -83,8 +91,8 @@ class DummyAgent(CaptureAgent):
         """
         actions = game_state.get_legal_actions(self.index)
 
-        '''
+        """
         You should change this in your own agent.
-        '''
+        """
 
         return random.choice(actions)

@@ -1,9 +1,8 @@
+//Testing Environment for MyTeam
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "Python: Current File",
             "type": "python",
@@ -15,14 +14,42 @@
                 "-b",
                 "pacman-contest\\src\\contest\\baselineTeam.py",
                 "--layout",
-                "pacman-contest\\src\\contest\\layouts\\defaultCapture",
+                "pacman-contest\\src\\contest\\layouts\\defaultCapture"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"},
-            // Anaconda myenv environment
-            "python": "C:\\Users\\berna\\anaconda3\\envs\\pacman-contest\\python.exe"
-        }
+                "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"
+            },
+            "python": "C:\\Users\\camil\\anaconda3\\envs\\pacman\\python.exe"
+        },
     ]
 }
+
+// GRID SEARCH
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+
+//         {
+//             "name": "Python: Current File",
+//             "type": "python",
+//             "request": "launch",
+//             "program": "pacman-contest\\src\\contest\\optimizer.py",
+//             "args": [
+//                 "-r",
+//                 "myTeam.py",
+//                 "-b",
+//                 "pacman-contest\\src\\contest\\baselineTeam.py",
+//                 "--layout",
+//                 "pacman-contest\\src\\contest\\layouts\\defaultCapture",
+//             ],
+//             "console": "integratedTerminal",
+//             "justMyCode": false,
+//             "env": {
+//                 "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"
+//             },
+//             "python": "C:\\Users\\berna\\anaconda3\\envs\\pacman-contest\\python.exe"
+//         },
+//     ]
+// }

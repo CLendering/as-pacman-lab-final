@@ -4,7 +4,7 @@
 # educational purposes provided that (1) you do not distribute or publish
 # solutions, (2) you retain this notice, and (3) you provide clear
 # attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
-# 
+#
 # Attribution Information: The Pacman AI projects were developed at UC Berkeley.
 # The core projects and autograders were primarily created by John DeNero
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
@@ -63,7 +63,7 @@ class CaptureAgent(Agent):
     # Methods to store key info #
     #############################
 
-    def __init__(self, index, time_for_computing=.1):
+    def __init__(self, index, time_for_computing=0.1):
         """
         Lists several variables you can query:
         self.index = index for this agent
@@ -120,7 +120,8 @@ class CaptureAgent(Agent):
         self.distancer.getMazeDistances()
 
         import __main__
-        if '_display' in dir(__main__):
+
+        if "_display" in dir(__main__):
             self.display = __main__._display
 
     def final(self, game_state):
@@ -134,13 +135,13 @@ class CaptureAgent(Agent):
         self.agentsOnTeam = agents_on_team
 
     def observation_function(self, game_state):
-        """ Changing this won't affect pacclient.py, but will affect capture.py """
+        """Changing this won't affect pacclient.py, but will affect capture.py"""
         return game_state.make_observation(self.index)
 
     def debug_draw(self, cells, color, clear=False):
-
         if self.display:
             from captureGraphicsDisplay import PacmanGraphics
+
             if isinstance(self.display, PacmanGraphics):
                 if not type(cells) is list:
                     cells = [cells]
@@ -149,6 +150,7 @@ class CaptureAgent(Agent):
     def debug_clear(self):
         if self.display:
             from captureGraphicsDisplay import PacmanGraphics
+
             if isinstance(self.display, PacmanGraphics):
                 self.display.clearDebug()
 
@@ -295,11 +297,12 @@ class CaptureAgent(Agent):
         dists = []
         for dist in distributions:
             if dist is not None:
-                if not isinstance(dist, util.Counter): raise Exception("Wrong type of distribution")
+                if not isinstance(dist, util.Counter):
+                    raise Exception("Wrong type of distribution")
                 dists.append(dist)
             else:
                 dists.append(util.Counter())
-        if self.display is not None and 'update_distributions' in dir(self.display):
+        if self.display is not None and "update_distributions" in dir(self.display):
             self.display.update_distributions(dists)
         else:
             self._distributions = dists  # These can be read by pacclient.py
@@ -307,9 +310,9 @@ class CaptureAgent(Agent):
 
 class TimeoutAgent(Agent):
     """
-  A random agent that takes too much time. Taking
-  too much time results in penalties and random moves.
-  """
+    A random agent that takes too much time. Taking
+    too much time results in penalties and random moves.
+    """
 
     def __init__(self, index):
         super().__init__(index)
@@ -318,5 +321,6 @@ class TimeoutAgent(Agent):
     def get_action(self, state):
         import random
         import time
+
         time.sleep(2.0)
         return random.choice(state.get_legal_actions(self.index))
