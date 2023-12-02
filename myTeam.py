@@ -116,6 +116,29 @@ def get_first_definite_position(observation_history,agent, current_timeleft, tim
     # If no definite position was found, return None
     return None
 
+# Get adjacent positions up to a certain distance, by adding and subtracting the distance to the x and y coordinates from (1 to distance)
+def get_adjacent_positions(position, distance):
+    adjacent_positions = []
+    for i in range(1, distance + 1):
+        adjacent_positions.append((position[0] + i, position[1]))
+        adjacent_positions.append((position[0] - i, position[1]))
+        adjacent_positions.append((position[0], position[1] + i))
+        adjacent_positions.append((position[0], position[1] - i))
+    return adjacent_positions
+
+
+# Check if position is legal (not a wall) and not negative and not out of bounds based on board width and height
+def is_legal_position(position, game_state):
+    return (
+        position[0] >= 0
+        and position[1] >= 0
+        and position[0] < game_state.data.layout.width
+        and position[1] < game_state.data.layout.height
+        and not game_state.has_wall(position[0], position[1])
+    )
+
+
+
 #################
 # Team creation #
 #################
@@ -125,8 +148,8 @@ def create_team(
     first_index,
     second_index,
     is_red,
-    first="OffensiveAStarAgent",
-    second="DefensiveReflexAgent",
+    first="DefensiveAStarAgent",
+    second="DefensiveAStarAgent",
     num_training=0,
 ):
     """
@@ -759,8 +782,345 @@ class OffensiveAStarAgent(CaptureAgent):
         return heuristic
 
 
-# Based on the goal, finds the optimal path and executes it
+# DEFENSIVE
+class GoalPlannerDefensive(GoalPlanner):
+    SAFE_DISTANCE = 5
+    ROAM_LIMIT_MAX = 5
+    ROAM_LIMIT_MIN = 2
+    PERCENTAGE_FOOD_PELLETS_SMART_OFFENSIVE = 0.1
+    LIMIT_TIMER_SMART_OFFENSIVE = 50
+    LIMIT_SMART_OFFENSIVE_CLOSE_FOOD = 6
+    SMART_OFFENSIVE_CLOSE_FOOD_MULTIPLIER = 2.5
+    
+    @staticmethod
+    def compute_goal(agent, game_state):
+        # Get useful information
+        agent_pos = game_state.get_agent_position(agent.index)
+        agent_state = game_state.get_agent_state(agent.index)
+        agent_is_pacman = game_state.get_agent_state(agent.index).is_pacman
 
+        # Get the center of the board
+        center_of_board = (
+            int(game_state.data.layout.width / 2),
+            int(game_state.data.layout.height / 2),
+        )
+
+        # Enemy Pacman Positions
+        enemy_pacman_positions = {
+            opponent: game_state.get_agent_position(opponent)
+            for opponent in agent.get_opponents(game_state)
+            if game_state.get_agent_state(opponent).is_pacman
+        }
+        # Remove None values
+        enemy_pacman_positions = {
+            k: v for k, v in enemy_pacman_positions.items() if v is not None
+        }
+
+        # Enemy Ghost Positions
+        enemy_ghost_positions = {
+            opponent: game_state.get_agent_position(opponent)
+            for opponent in agent.get_opponents(game_state)
+            if not game_state.get_agent_state(opponent).is_pacman
+        }
+        # Remove None values
+        enemy_ghost_positions = {
+            k: v for k, v in enemy_ghost_positions.items() if v is not None
+        }
+        
+        # Smart Offensive: If the agent has eaten an enemy pacman and there's not another enemy pacman nearby and is close to the center of the board (vertical line), if there are any
+        # close food pellets in the enemy side of the board, go for them up to a limit of 10% of the total food pellets in the enemy side of the board
+        if agent._has_eaten_enemy_pacman_and_no_other_close_enemies(game_state) and agent._is_close_to_center(game_state, GoalPlannerDefensive.LIMIT_SMART_OFFENSIVE_CLOSE_FOOD):
+            agent.smart_offensive_mode = True
+            agent.smart_offensive_timer = 0
+        
+        if agent.smart_offensive_timer > GoalPlannerDefensive.LIMIT_TIMER_SMART_OFFENSIVE:
+            agent.smart_offensive_mode = False
+            agent.smart_offensive_timer = 0
+
+        if agent.smart_offensive_mode:
+            enemy_food = agent.get_food(game_state).as_list()
+            enemy_food_limit = int(len(enemy_food) * GoalPlannerDefensive.PERCENTAGE_FOOD_PELLETS_SMART_OFFENSIVE)  # 10% of enemy food pellets
+
+            if agent_state.num_carrying >= enemy_food_limit:
+                agent.smart_offensive_mode = False
+                agent.smart_offensive_timer = 0
+            else:
+                # Find food pellets close to the center line on the enemy side
+                close_enemy_food = [
+                    food for food in enemy_food 
+                    if abs(food[0] - game_state.data.layout.width // 2) <= GoalPlannerDefensive.LIMIT_SMART_OFFENSIVE_CLOSE_FOOD
+                    and agent.get_maze_distance(agent_pos, food) <= GoalPlannerDefensive.LIMIT_SMART_OFFENSIVE_CLOSE_FOOD * GoalPlannerDefensive.SMART_OFFENSIVE_CLOSE_FOOD_MULTIPLIER
+                ]
+
+                # If there are close food pellets on the enemy side, choose the closest one
+                if close_enemy_food:
+                    closest_food = min(
+                        close_enemy_food, 
+                        key=lambda food: agent.get_maze_distance(agent_pos, food)
+                    )
+                    return closest_food
+                
+        else:
+            # If agent is a pacman and not on smart offensive, set the goal to return to our side of the board
+            if agent_is_pacman:
+                if agent.red:
+                    return bfs_until_non_wall((
+                        int(game_state.data.layout.width / 4),
+                        agent_pos[1]), game_state
+                    )[-1]
+                else:
+                    return bfs_until_non_wall((
+                        int(3 * game_state.data.layout.width / 4),
+                        agent_pos[1]), game_state)[-1]
+                    
+            
+        # If the Agent is Scared, is a Ghost and can see an invader, set the goal to evade the invader by a safe distance margin
+        if agent_is_pacman == False and game_state.get_agent_state(agent.index).scared_timer > 0 and len(enemy_pacman_positions) > 0:
+            closest_invader = min(
+                enemy_pacman_positions,
+                key=lambda opponent: agent.get_maze_distance(
+                    agent_pos, enemy_pacman_positions[opponent]
+                ),
+            )
+            closest_invader_pos = enemy_pacman_positions[closest_invader]
+            # If the closest invader is close enough, set the goal to evade the invader calculating the closest safe position that is not a wall
+            # and is closer to the center of the board, but not crossing the center of the board (so when it resets, we can defend again)
+            if agent.get_maze_distance(agent_pos, closest_invader_pos) <= GoalPlannerDefensive.SAFE_DISTANCE:
+                # If agent is red, the closest safe position is to the right of the enemy as long as it does not cross the center of the board
+                # If it crosses, go up or down if possible
+                if agent.red:
+                    closest_safe_position = (
+                        closest_invader_pos[0] + GoalPlannerDefensive.SAFE_DISTANCE,
+                        closest_invader_pos[1],
+                    )
+                    if closest_safe_position[0] > center_of_board[0]:
+                        closest_safe_position = (
+                            closest_invader_pos[0],
+                            closest_invader_pos[1] + GoalPlannerDefensive.SAFE_DISTANCE,
+                        )
+
+                        # Check if the closest safe position is a wall or is valid by checking the height of the board and if its negative
+                        if is_legal_position(closest_safe_position, game_state) == False:
+                            closest_safe_position = (
+                                closest_invader_pos[0],
+                                closest_invader_pos[1] - GoalPlannerDefensive.SAFE_DISTANCE,
+                            )
+                        
+                else:
+                    closest_safe_position = (
+                        closest_invader_pos[0] - GoalPlannerDefensive.SAFE_DISTANCE,
+                        closest_invader_pos[1],
+                    )
+                    if closest_safe_position[0] < center_of_board[0]:
+                        closest_safe_position = (
+                            closest_invader_pos[0],
+                            closest_invader_pos[1] + GoalPlannerDefensive.SAFE_DISTANCE,
+                        )
+
+                        # Check if the closest safe position is a wall or is valid by checking the height of the board and if its negative
+                        if is_legal_position(closest_safe_position, game_state) == False:
+                            closest_safe_position = (
+                                closest_invader_pos[0],
+                                closest_invader_pos[1] - GoalPlannerDefensive.SAFE_DISTANCE,
+                            )
+
+                return bfs_until_non_wall(closest_safe_position, game_state)[-1]
+                    
+        # Closest Invader Targeting: If the agent can see an invader and is a ghost, set the goal to chase the invader
+        if agent_is_pacman == False and len(enemy_pacman_positions) > 0:
+            closest_invader = min(
+                enemy_pacman_positions,
+                key=lambda opponent: agent.get_maze_distance(
+                    agent_pos, enemy_pacman_positions[opponent]
+                ),
+            )
+            return enemy_pacman_positions[closest_invader]
+
+        # Key Area Roaming: If the agent is not scared, cannot see any invaders and is a ghost, set the goal to roam around key areas with
+        # high food density keeping track of the position of food pellets that have been eaten by the opponent team. If a food pellet is eaten
+        # by the opponent team, set the goal to the closest food pellet that has not been eaten by the opponent team and is in the agent's side
+        # Get food pellets in the agent's side of the board
+        food_list = agent.get_food_you_are_defending(game_state).as_list()
+
+        # Get the food list of at most the last 15 game states according to the observation history and go towards
+        # the most recent food pellet that has been eaten by the opponent team. If there are less than 15 game states in the observation history,
+        # just iterate over the ones that are available without throwing an error
+        for i in range(2, min(15, len(agent.observationHistory))):
+            # Get the food list of the previous game state according to the observation history
+            previous_food_list = agent.get_food_you_are_defending(
+                agent.observationHistory[-i]
+            ).as_list()
+
+            # Get the food pellets that have been eaten by the opponent team
+            eaten_food_list = list(set(previous_food_list) - set(food_list))
+
+            # If there are food pellets that have been eaten by the opponent team, set the goal to the closest food pellet that has not been eaten
+            # by the opponent team and is in the agent's side
+            if len(eaten_food_list) > 0:
+                closest_food = min(
+                    eaten_food_list,
+                    key=lambda food: agent.get_maze_distance(agent_pos, food),
+                )
+                return closest_food
+            
+    
+        
+        # Roaming Logic: If the agent is not scared, cannot see any invaders and is a ghost, set the goal to roam around key areas which
+        # are defined as being close to the border up to a distance between 2 and 5 of the center line of the board.
+         # Determine the border range based on the agent's side (red or blue)
+        if agent.red:
+            border_x = range(center_of_board[0] - GoalPlannerDefensive.ROAM_LIMIT_MAX, center_of_board[0] - GoalPlannerDefensive.ROAM_LIMIT_MIN)
+        else:
+            border_x = range(center_of_board[0] + GoalPlannerDefensive.ROAM_LIMIT_MIN, center_of_board[0] + GoalPlannerDefensive.ROAM_LIMIT_MAX)
+
+        # Generate a list of potential goal positions near the border
+        potential_goals = []
+        for x in border_x:
+            for y in range(1, game_state.data.layout.height - 1):  # Avoid the very top and bottom
+                if not game_state.has_wall(x, y):
+                    potential_goals.append((x, y))
+
+        # Choose a random goal from the list of potential goals
+        if potential_goals:
+            return random.choice(potential_goals)
+        
+        return game_state.data.layout.getRandomLegalPosition()
+    
+
+
+class DefensiveAStarAgent(CaptureAgent):
+    def __init__(
+        self, index, time_for_computing=0.1, action_planner=GoalPlannerDefensive
+    ):
+        super().__init__(index, time_for_computing)
+        self.start = None
+        self.goal = None
+        self.plan = None
+        self.smart_offensive_mode = False
+        self.smart_offensive_timer = 0
+        self.action_planner = action_planner
+
+    def register_initial_state(self, game_state):
+        self.start = game_state.get_agent_position(self.index)
+        CaptureAgent.register_initial_state(self, game_state)
+        self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
+        self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
+
+    # Implements A* and executes the plan
+    def choose_action(self, game_state):
+        if self.smart_offensive_mode:
+            self.smart_offensive_timer += 1
+
+        self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
+        self.plan = aStarSearch(
+            agent=self,
+            goal=self.goal,
+            game_state=game_state,
+            heuristic=self.defensive_heuristic,
+        )
+
+        actions = game_state.get_legal_actions(self.index)
+
+        if len(self.plan) > 0:
+            next_action = self.plan.pop(0)
+            if next_action in actions:
+                return next_action
+            else:
+                self.goal = self.action_planner.compute_goal(
+                    agent=self, game_state=game_state
+                )
+                self.plan = aStarSearch(
+                    agent=self, goal=self.goal, game_state=game_state
+                )
+
+            new_next_action = self.plan.pop(0)
+            if new_next_action in actions:
+                return new_next_action
+            else:
+                return random.choice(actions)
+        else:
+            return random.choice(actions)
+
+    def defensive_heuristic(self, agent, goal, game_state):
+
+        heuristic = 0
+
+        agent_is_pacman = game_state.get_agent_state(agent.index).is_pacman
+
+        return heuristic
+    
+    def _has_eaten_enemy_pacman_and_no_other_close_enemies(self, game_state):
+        # Get the previous game state if it exists
+        if len(self.observationHistory) > 1:
+            previous_game_state = self.observationHistory[-2]
+
+            # Get the opponent team members index
+            opponent_team_members = self.get_opponents(game_state)
+
+            # Get the opponent team members positions in the previous game state and the current game state. If before the opponent team member
+            # was not None, but now it is, and the distance from the agent now to the opponent team member in the previous game state is less than
+            # 2, then the agent has eaten an enemy pacman
+            previous_opponent_team_members_pos = {
+                opponent: previous_game_state.get_agent_position(opponent)
+                for opponent in opponent_team_members
+            }
+            current_opponent_team_members_pos = {
+                opponent: game_state.get_agent_position(opponent)
+                for opponent in opponent_team_members
+            }
+            
+            # Distance from the agent now to the opponent team member in the previous game state is less than 2
+            distance_condition = lambda opponent: self.get_maze_distance(
+                game_state.get_agent_position(self.index),
+                previous_opponent_team_members_pos[opponent],
+            ) <= 2
+
+            # If before the opponent team member was not None, but now it is, and the distance from the agent now to the opponent team member
+            # in the previous game state is less than 2, then the agent has eaten an enemy pacman
+            eaten_condition = lambda opponent: (
+                previous_opponent_team_members_pos[opponent]
+                and current_opponent_team_members_pos[opponent] is None
+                and distance_condition(opponent)
+            )
+
+            # Check if there is another enemy pacman nearby after eating the enemy pacman by checking if any of the current opponent team members
+            # positions is not None and the distance from the agent to the opponent team member is less than 5
+            current_opponent_condition = lambda opponent: (
+                current_opponent_team_members_pos[opponent]
+                and self.get_maze_distance(
+                    game_state.get_agent_position(self.index),
+                    current_opponent_team_members_pos[opponent],
+                )
+                <= 5
+            )
+                
+
+            # If there is at least one opponent team member that has been eaten, return True
+            if any(eaten_condition(opponent) for opponent in opponent_team_members) and not any(current_opponent_condition(opponent) for opponent in opponent_team_members):
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+    def _is_close_to_center(self, game_state, distance=5):
+        # Get the center of the board
+        center_of_board = (
+            int(game_state.data.layout.width / 2),
+            int(game_state.data.layout.height / 2),
+        )
+
+        # Get the agent's position
+        agent_pos = game_state.get_agent_position(self.index)
+
+        # Calculate the distance to the center of the board
+        distance_to_center = abs(agent_pos[0] - center_of_board[0])
+
+        # If the distance to the center of the board is less than 5, return True
+        if distance_to_center <= distance:
+            return True
+        else:
+            return False
 
 class OffensiveReflexAgent(ReflexCaptureAgent):
     """

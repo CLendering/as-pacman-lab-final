@@ -1547,7 +1547,7 @@ def run_optimizer(args):
     }
 
     # Args for --super-quiet and num_games
-    args_append = ["--super-quiet", "--numGames", "1"]
+    args_append = ["--super-quiet", "--numGames", "5"]
     args.extend(args_append)
 
     # Dict to store grid search results
@@ -1601,11 +1601,19 @@ def run_optimizer(args):
                                                         match_id=options["match_id"],
                                                     )
 
+                                                    games_data_only_winner_and_score = []
+                                                    for game in games_data:
+                                                        games_data_only_winner_and_score.append((game[4], game[3]))
+
+                                                        
+
                                                     # Store results
-                                                    grid_search_results[str(grid_search)] = games_data
+                                                    grid_search_results[str(grid_search)] = games_data_only_winner_and_score
 
 
                                                 print(f"\nTotal Time Game: {total_time}", file=sys.stdout)
+                                                # Print the parameters used for this game
+                                                print(f"\nFinished Parameters: {grid_search}", file=sys.stdout)
     # Store results in JSON file
     with open("grid_search_results.json", "w") as outfile:
         json.dump(grid_search_results, outfile)
@@ -1616,7 +1624,7 @@ def run_optimizer(args):
     for params in grid_search_results:
         avg_score = 0
         for game in grid_search_results[params]:
-            avg_score += game[3]
+            avg_score += game[1]
         avg_score /= len(grid_search_results[params])
         if avg_score > max_avg_score:
             max_avg_score = avg_score
@@ -1635,7 +1643,7 @@ def run_optimizer(args):
     for params in grid_search_results:
         win_rate = 0
         for game in grid_search_results[params]:
-            if game[4] == "Red":
+            if game[0] == "Red":
                 win_rate += 1
         win_rate /= len(grid_search_results[params])
         if win_rate > max_win_rate:
