@@ -1520,15 +1520,15 @@ def run(args):
 def run_optimizer(args):
     # Grid Search for Offensive A* Agent
     ## PENALTY FOR STATES WITH GHOSTS NEARBY
-    OPPONENT_GHOST_WEIGHT = [0.5, 1, 2, 4, 8, 10]
+    OPPONENT_GHOST_WEIGHT = [0.5, 1, 2, 4, 8, 12]
     OPPONENT_GHOST_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    OPPONENT_PACMAN_WEIGHT = [0.5, 1, 2, 4, 8, 10]
+    OPPONENT_PACMAN_WEIGHT = [0.5, 1, 2, 4, 8, 12]
     OPPONENT_PACMAN_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    POWER_PELLET_WEIGHT = [0.5, 1, 2, 4, 8, 10]
+    POWER_PELLET_WEIGHT = [0.5, 1, 2, 4, 8, 12]
     POWER_PELLET_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    SCARED_GHOST_REWARD = [0.5, 1, 2, 4, 8, 10]
+    SCARED_GHOST_REWARD = [0.5, 1, 2, 4, 8, 12]
     SCARED_GHOST_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    GHOST_COLLISION_PENALTY = [0.5, 1, 2, 4, 8, 10]
+    GHOST_COLLISION_PENALTY = [0.5, 1, 2, 4, 8, 12]
     GHOST_COLLISION_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
     EPSILON = [0.001]
 
@@ -1547,7 +1547,7 @@ def run_optimizer(args):
     }
 
     # Args for --super-quiet and num_games
-    args_append = ["--super-quiet", "--numGames", "5"]
+    args_append = ["--super-quiet", "--numGames", "10"]
     args.extend(args_append)
 
     # Dict to store grid search results
@@ -1614,48 +1614,45 @@ def run_optimizer(args):
                                                 print(f"\nTotal Time Game: {total_time}", file=sys.stdout)
                                                 # Print the parameters used for this game
                                                 print(f"\nFinished Parameters: {grid_search}", file=sys.stdout)
-    # Store results in JSON file
-    with open("grid_search_results.json", "w") as outfile:
-        json.dump(grid_search_results, outfile)
 
-    # Print best parameters based on average score
-    max_avg_score = 0
-    best_params = {}
-    for params in grid_search_results:
-        avg_score = 0
-        for game in grid_search_results[params]:
-            avg_score += game[1]
-        avg_score /= len(grid_search_results[params])
-        if avg_score > max_avg_score:
-            max_avg_score = avg_score
-            best_params = params
 
-    print(f"\nBest parameters: {best_params}")
-    print(f"Average score: {max_avg_score}")
-
-    # Store best parameters in JSON file
-    with open("best_params_AVGSCORE.json", "w") as outfile:
-        json.dump(best_params, outfile)
-
-    # Print best parameters based on win rate
-    max_win_rate = 0
-    best_params = {}
+    # Print best parameters based on win rate but untie with average score
+    params_array = []
     for params in grid_search_results:
         win_rate = 0
         for game in grid_search_results[params]:
             if game[0] == "Red":
                 win_rate += 1
         win_rate /= len(grid_search_results[params])
-        if win_rate > max_win_rate:
-            max_win_rate = win_rate
-            best_params = params
-    
+        avg_score = 0
+        for game in grid_search_results[params]:
+            avg_score += game[1]
+        avg_score /= len(grid_search_results[params])
+        params_array.append((params, win_rate, avg_score))
+
+    params_array.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    best_params = params_array[0][0]
+    max_win_rate = params_array[0][1]
+    max_avg_score = params_array[0][2]
+
     print(f"\nBest parameters: {best_params}")
     print(f"Win rate: {max_win_rate}")
+    print(f"Average score: {max_avg_score}")
 
-    # Store best parameters in JSON file
-    with open("best_params_WINRATE.json", "w") as outfile:
-        json.dump(best_params, outfile)
+    # Store best parameters in JSON file, with the win rate and average score below
+    best_params_dict = {}
+    best_params_dict["best_params"] = best_params
+    best_params_dict["win_rate"] = max_win_rate
+    best_params_dict["avg_score"] = max_avg_score
+
+    with open("best_params.json", "w") as f:
+        json.dump(best_params_dict, f)
+
+    # Store all results in JSON file based on params_array
+    with open("grid_search_results.json", "w") as f:
+        json.dump(params_array, f)
+    
+
 
 
 def main():

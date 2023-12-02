@@ -82,6 +82,10 @@ def bfs_until_non_wall(start, game_state):
         if current[1] >= game_state.data.layout.height or current[0] >= game_state.data.layout.width:
             continue
 
+        # Check if current is not negative in any coordinate
+        if current[0] < 0 or current[1] < 0:
+            continue
+
         # Stop if the current position is not a wall
         if not game_state.has_wall(current[0], current[1]):
             path = []
@@ -727,6 +731,9 @@ class OffensiveSwitchAStarAgent(CaptureAgent):
         # print("Goal calc time: ", time.perf_counter() - start_goal_calc)
         # start_plan_calc = time.perf_counter()
 
+        # Fix goal if it is not legal
+        self._fix_goal_if_not_legal(game_state)
+
         self.plan = aStarSearch(
             agent=self,
             goal=self.goal,
@@ -790,6 +797,26 @@ class OffensiveSwitchAStarAgent(CaptureAgent):
 
         return heuristic
     
+    # Helper function that fixes the goal if it is not legal
+    def _fix_goal_if_not_legal(self, game_state):
+        # If any of the coordinates of the goal is negative, set that coordinate to 0
+        if self.goal[0] < 0:
+            self.goal = (0, self.goal[1])
+        if self.goal[1] < 0:
+            self.goal = (self.goal[0], 0)
+
+        # If any of the coordinates of the goal is greater than the width or height of the board, set that coordinate to the width or height of the board
+        if self.goal[0] > game_state.data.layout.width:
+            self.goal = (game_state.data.layout.width, self.goal[1])
+        if self.goal[1] > game_state.data.layout.height:
+            self.goal = (self.goal[0], game_state.data.layout.height)
+
+        if is_legal_position(self.goal, game_state) == False:
+            self.goal = (
+                int(game_state.data.layout.width / 2),
+                int(game_state.data.layout.height / 2),
+            )
+
     # Helper function to categorize opponents into ghosts and pacmen
     def _categorize_opponents(self, game_state, opponent_team_members, profiling_dict=None):
         start_time = time.perf_counter() if profiling_dict is not None else None
@@ -1238,6 +1265,10 @@ class DefensiveAStarAgent(CaptureAgent):
             self.smart_offensive_timer += 1
 
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
+
+        # Fix goal if it is not legal
+        self._fix_goal_if_not_legal(game_state)
+
         self.plan = aStarSearch(
             agent=self,
             goal=self.goal,
@@ -1292,6 +1323,26 @@ class DefensiveAStarAgent(CaptureAgent):
 
         return heuristic
     
+    # Helper function that fixes the goal if it is not legal
+    def _fix_goal_if_not_legal(self, game_state):
+        # If any of the coordinates of the goal is negative, set that coordinate to 0
+        if self.goal[0] < 0:
+            self.goal = (0, self.goal[1])
+        if self.goal[1] < 0:
+            self.goal = (self.goal[0], 0)
+
+        # If any of the coordinates of the goal is greater than the width or height of the board, set that coordinate to the width or height of the board
+        if self.goal[0] > game_state.data.layout.width:
+            self.goal = (game_state.data.layout.width, self.goal[1])
+        if self.goal[1] > game_state.data.layout.height:
+            self.goal = (self.goal[0], game_state.data.layout.height)
+
+        if is_legal_position(self.goal, game_state) == False:
+            self.goal = (
+                int(game_state.data.layout.width / 2),
+                int(game_state.data.layout.height / 2),
+            )
+
     def _categorize_allies(self, game_state, ally_team_members, profiling_dict=None):
         start_time = time.perf_counter() if profiling_dict is not None else None
 
@@ -1499,6 +1550,9 @@ class OffensiveAStarAgent(CaptureAgent):
         # print("Goal calc time: ", time.perf_counter() - start_goal_calc)
         # start_plan_calc = time.perf_counter()
 
+        # Fix goal if it is not legal
+        self._fix_goal_if_not_legal(game_state)
+
         self.plan = aStarSearch(
             agent=self,
             goal=self.goal,
@@ -1562,6 +1616,26 @@ class OffensiveAStarAgent(CaptureAgent):
 
         return heuristic
     
+    # Helper function that fixes the goal if it is not legal
+    def _fix_goal_if_not_legal(self, game_state):
+        # If any of the coordinates of the goal is negative, set that coordinate to 0
+        if self.goal[0] < 0:
+            self.goal = (0, self.goal[1])
+        if self.goal[1] < 0:
+            self.goal = (self.goal[0], 0)
+
+        # If any of the coordinates of the goal is greater than the width or height of the board, set that coordinate to the width or height of the board
+        if self.goal[0] > game_state.data.layout.width:
+            self.goal = (game_state.data.layout.width, self.goal[1])
+        if self.goal[1] > game_state.data.layout.height:
+            self.goal = (self.goal[0], game_state.data.layout.height)
+
+        if is_legal_position(self.goal, game_state) == False:
+            self.goal = (
+                int(game_state.data.layout.width / 2),
+                int(game_state.data.layout.height / 2),
+            )
+
     # Helper function to categorize opponents into ghosts and pacmen
     def _categorize_opponents(self, game_state, opponent_team_members, profiling_dict=None):
         start_time = time.perf_counter() if profiling_dict is not None else None
