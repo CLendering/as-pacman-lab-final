@@ -916,7 +916,7 @@ class GoalPlannerDefensive(GoalPlanner):
     LIMIT_TIMER_SMART_OFFENSIVE = 50
     LIMIT_SMART_OFFENSIVE_CLOSE_FOOD = 6
     SMART_OFFENSIVE_CLOSE_FOOD_MULTIPLIER = 2.5
-    GET_AWAY_FROM_ENEMY_PACMAN_DISTANCE = 6
+    GET_AWAY_FROM_ALLY_GHOSTS_DISTANCE = 6
     
     @staticmethod
     def compute_goal(agent, game_state):
