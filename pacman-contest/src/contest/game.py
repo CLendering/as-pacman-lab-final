@@ -538,6 +538,10 @@ except:
     _BOINC_ENABLED = False
 
 
+agent_to_color = {0: 'Red', 1:'Blue', 2:'Orange', 3:'Green'}
+PRINT_ACTIONS_AND_POSITIONS = False
+
+
 class Game:
     """
     The Game manages the control flow, soliciting actions from agents.
@@ -731,6 +735,11 @@ class Game:
             else:
                 self.state = self.state.generate_successor(agent_index, action)
 
+            position = self.state.get_agent_position(agent_index)
+            
+            if PRINT_ACTIONS_AND_POSITIONS:
+                print(f'{agent_to_color[agent_index]} did action {action} and is now at {position}')
+            
             # Change the display
             self.display.update(self.state.data)
 

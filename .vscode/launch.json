@@ -18,6 +18,22 @@
             ]
         },
         {
+            "name": "[MyMap] Pacman Contest with Particle Filter Team",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+                "-r",
+                "agents/team_with_filter/particleFilterTeam",
+                "-l",
+                "myTestCapture",
+                "--fixRandomSeed"
+            ]
+        },
+        {
             "name": "[quiet] Pacman Contest with Particle Filter Team",
             "type": "python",
             "request": "launch",
