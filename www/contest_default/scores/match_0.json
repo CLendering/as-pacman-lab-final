@@ -11,7 +11,7 @@
         ]
     ],
     "layouts": [
-        "pacman-contest\\src\\contest\\layouts\\defaultCapture.lay"
+        "pacman-contest\\src\\contest\\layouts\\jumboCapture.lay"
     ],
     "max_steps": 1200,
     "teams_stats": {

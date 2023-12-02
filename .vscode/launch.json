@@ -21,7 +21,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"
             },
-            "python": "C:\\Users\\berna\\anaconda3\\envs\\pacman-contest\\python.exe"
+            "python": "C:\\Users\\camil\\anaconda3\\envs\\pacman\\python.exe"
         },
     ]
 }
