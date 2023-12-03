@@ -17,6 +17,8 @@
                 // add other params as relative from cwd (${workspaceFolder}/pacman-contest/src/contest)
                 // e.g. "-b", "baselineTeam" or "-l", "mediumCapture"
                 // or as absolute paths using ${workspaceFolder} as root
+                "--delay-step",
+                "0"
             ]
         },
         {
@@ -32,7 +34,9 @@
                 "${workspaceFolder}/myTeam",
                 "--layout",
                 "myTestCapture",
-                "--fixRandomSeed"
+                "--fixRandomSeed",
+                "--delay-step",
+                "0"
             ]
         },
         {
@@ -46,7 +50,9 @@
             "args": [
                 "-r",
                 "${workspaceFolder}/myTeam",
-                "-q"
+                "-q",
+                "--delay-step",
+                "0"
             ]
         },
         {
@@ -62,7 +68,9 @@
                 "${workspaceFolder}/myTeam",
                 "-q",
                 "-i",
-                "20"
+                "20",
+                "--delay-step",
+                "0"
             ]
         },
         {
@@ -78,6 +86,8 @@
                 "customTeam",
                 "--layout",
                 "defaultCapture",
+                "--delay-step",
+                "0"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -92,7 +102,9 @@
             "justMyCode": true,
             "args": [
                 "--keys0",
-                "--keys1"
+                "--keys1",
+                "--delay-step",
+                "0"
             ]
         },
     ]
