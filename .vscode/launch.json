@@ -10,11 +10,13 @@
             "request": "launch",
             "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "justMyCode": true,
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "args": [
                 "-r",
-                "myTeam",
+                "${workspaceFolder}/myTeam",
+                // add other params as relative from cwd (${workspaceFolder}/pacman-contest/src/contest)
+                // e.g. "-b", "baselineTeam" or "-l", "mediumCapture"
+                // or as absolute paths using ${workspaceFolder} as root
             ]
         },
         {
@@ -23,12 +25,12 @@
             "request": "launch",
             "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "justMyCode": true,
             "args": [
                 "-r",
-                "myTeam",
-                "-l",
+                "${workspaceFolder}/myTeam",
+                "--layout",
                 "myTestCapture",
                 "--fixRandomSeed"
             ]
@@ -43,44 +45,54 @@
             "justMyCode": true,
             "args": [
                 "-r",
-                "agents/team_with_filter/particleFilterTeam",
+                "${workspaceFolder}/myTeam",
                 "-q"
             ]
         },
         {
-            "name": "Plot Particle Filter",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/pacman-contest/src/contest/particle_filter/plot.py",
-            "console": "integratedTerminal",
-            "justMyCode": true
-        },
-        {
-            "name": "[short, quiet] Pacman Contest with Particle Filter Team",
+            "name": "[short, quiet] Pacman Contest",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "justMyCode": true,
             "args": [
                 "-r",
-                "agents/team_with_filter/particleFilterTeam",
+                "${workspaceFolder}/myTeam",
                 "-q",
                 "-i",
                 "20"
             ]
         },
         {
-            "name": "Keyboard Agent (doesn't work bc of some bug)",
+            "name": "Optimizer",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/optimizer.py",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "args": [
+                "-r",
+                "${workspaceFolder}/myTeam",
+                "-b",
+                "customTeam",
+                "--layout",
+                "defaultCapture",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
+        {
+            "name": "Keyboard Agents (doesn't work bc of some bug)",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "justMyCode": true,
             "args": [
                 "--keys0",
+                "--keys1"
             ]
         },
     ]
