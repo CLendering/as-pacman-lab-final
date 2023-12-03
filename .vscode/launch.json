@@ -1,55 +1,111 @@
-//Testing Environment for MyTeam
-// {
-//     "version": "0.2.0",
-//     "configurations": [
-
-//         {
-//             "name": "Python: Current File",
-//             "type": "python",
-//             "request": "launch",
-//             "program": "pacman-contest\\src\\contest\\capture.py",
-//             "args": [
-//                 "-r",
-//                 "myTeam.py",
-//                 "-b",
-//                 "pacman-contest\\src\\contest\\customTeam.py",
-//                 "--layout",
-//                 "pacman-contest\\src\\contest\\layouts\\defaultCapture"
-//             ],
-//             "console": "integratedTerminal",
-//             "justMyCode": false,
-//             "env": {
-//                 "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"
-//             },
-//             "python": "C:\\Users\\berna\\anaconda3\\envs\\pacman-contest\\python.exe"
-//         },
-//     ]
-// }
-
-// GRID SEARCH
 {
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "Python: Current File",
+            "name": "Default Pacman Contest",
             "type": "python",
             "request": "launch",
-            "program": "pacman-contest\\src\\contest\\optimizer.py",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "args": [
                 "-r",
-                "myTeam.py",
-                "-b",
-                "pacman-contest\\src\\contest\\customTeam.py",
+                "${workspaceFolder}/myTeam",
+                // add other params as relative from cwd (${workspaceFolder}/pacman-contest/src/contest)
+                // e.g. "-b", "baselineTeam" or "-l", "mediumCapture"
+                // or as absolute paths using ${workspaceFolder} as root
+                "--delay-step",
+                "0"
+            ]
+        },
+        {
+            "name": "[alternate map, fixed seed] Pacman Contest ",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+                "-r",
+                "${workspaceFolder}/myTeam",
                 "--layout",
-                "pacman-contest\\src\\contest\\layouts\\defaultCapture",
+                "myTestCapture",
+                "--fixRandomSeed",
+                "--delay-step",
+                "0"
+            ]
+        },
+        {
+            "name": "[quiet] Pacman Contest",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+                "-r",
+                "${workspaceFolder}/myTeam",
+                "-q",
+                "--delay-step",
+                "0"
+            ]
+        },
+        {
+            "name": "[short, quiet] Pacman Contest",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+                "-r",
+                "${workspaceFolder}/myTeam",
+                "-q",
+                "-i",
+                "20",
+                "--delay-step",
+                "0"
+            ]
+        },
+        {
+            "name": "Optimizer",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/optimizer.py",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "args": [
+                "-r",
+                "${workspaceFolder}/myTeam",
+                "-b",
+                "customTeam",
+                "--layout",
+                "defaultCapture",
+                "--delay-step",
+                "0"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"
-            },
-            "python": "C:\\Users\\berna\\anaconda3\\envs\\pacman-contest\\python.exe"
+        },
+        {
+            "name": "Keyboard Agents (doesn't work bc of some bug)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+                "--keys0",
+                "--keys1",
+                "--delay-step",
+                "0"
+            ]
         },
     ]
 }
