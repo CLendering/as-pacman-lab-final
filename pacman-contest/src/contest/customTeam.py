@@ -34,20 +34,6 @@ from contest.game import Directions, Configuration, Actions
 from contest.capture import AgentRules
 
 
-# This is required so our own files can be imported when the contest is run
-import os
-import sys
-
-cd = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(cd)
-
-from particleFilter import EnemyPositionParticleFilter
-from ownFoodSupervisor import OwnFoodSupervisor
-from enemySuicideDetector import EnemySuicideDetector
-from particleFilterAgent import ParticleFilterAgent
-
-
-
 #################
 # Utility #
 #################
@@ -79,19 +65,6 @@ def bfs_until_non_wall(start, game_state):
     :param start: Tuple (x, y) representing the start coordinate.
     :return: List of tuples representing the path to the first non-wall position.
     """
-
-    # Correct start if its coordinates are negative
-    if start[0] < 0:
-        start = (0, start[1])
-    if start[1] < 0:
-        start = (start[0], 0)
-
-    # Correct start if its coordinates are greater than the width or height of the board
-    if start[0] >= game_state.data.layout.width:
-        start = (game_state.data.layout.width - 1, start[1])
-    if start[1] >= game_state.data.layout.height:
-        start = (start[0], game_state.data.layout.height - 1)
-        
     # Define movements: right, left, up, down
     movements = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
@@ -107,10 +80,6 @@ def bfs_until_non_wall(start, game_state):
         
         # check if current is in a valid position
         if current[1] >= game_state.data.layout.height or current[0] >= game_state.data.layout.width:
-            continue
-
-        # Check if current is not negative in any coordinate
-        if current[0] < 0 or current[1] < 0:
             continue
 
         # Stop if the current position is not a wall
@@ -183,8 +152,8 @@ def create_team(
     first_index,
     second_index,
     is_red,
-    first="OffensiveSwitchAStarAgent",
-    second="DefensiveAStarAgent",
+    first="OffensiveReflexAgent",
+    second="DefensiveReflexAgent",
     num_training=0,
 ):
     """
@@ -201,19 +170,92 @@ def create_team(
     any extra arguments, so you should make sure that the default
     behavior is what you want for the nightly contest.
     """
-    # the following objects are shared by both agents
-    enemy_position_particle_filters = dict()
-    own_food_supervisor = OwnFoodSupervisor()
-    enemy_suicide_detector = EnemySuicideDetector()
-    return [    
-                OffensiveSwitchAStarAgent(first_index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector), 
-                DefensiveAStarAgent(second_index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector)
-            ]
+    return [eval(first)(first_index), eval(second)(second_index)]
 
 
 ##########
 # Agents #
 ##########
+
+
+class ReflexCaptureAgent(CaptureAgent):
+    """
+    A base class for reflex agents that choose score-maximizing actions
+    """
+
+    def __init__(self, index, time_for_computing=0.1):
+        super().__init__(index, time_for_computing)
+        self.start = None
+
+    def register_initial_state(self, game_state):
+        self.start = game_state.get_agent_position(self.index)
+        CaptureAgent.register_initial_state(self, game_state)
+
+    def choose_action(self, game_state):
+        """
+        Picks among the actions with the highest Q(s,a).
+        """
+        actions = game_state.get_legal_actions(self.index)
+
+        # You can profile your evaluation time by uncommenting these lines
+        # start = time.time()
+        values = [self.evaluate(game_state, a) for a in actions]
+        # print 'eval time for agent %d: %.4f' % (self.index, time.time() - start)
+
+        max_value = max(values)
+        best_actions = [a for a, v in zip(actions, values) if v == max_value]
+
+        food_left = len(self.get_food(game_state).as_list())
+
+        if food_left <= 2:
+            best_dist = 9999
+            best_action = None
+            for action in actions:
+                successor = self.get_successor(game_state, action)
+                pos2 = successor.get_agent_position(self.index)
+                dist = self.get_maze_distance(self.start, pos2)
+                if dist < best_dist:
+                    best_action = action
+                    best_dist = dist
+            return best_action
+
+        return random.choice(best_actions)
+
+    def get_successor(self, game_state, action):
+        """
+        Finds the next successor which is a grid position (location tuple).
+        """
+        successor = game_state.generate_successor(self.index, action)
+        pos = successor.get_agent_state(self.index).get_position()
+        if pos != nearestPoint(pos):
+            # Only half a grid position was covered
+            return successor.generate_successor(self.index, action)
+        else:
+            return successor
+
+    def evaluate(self, game_state, action):
+        """
+        Computes a linear combination of features and feature weights
+        """
+        features = self.get_features(game_state, action)
+        weights = self.get_weights(game_state, action)
+        return features * weights
+
+    def get_features(self, game_state, action):
+        """
+        Returns a counter of features for the state
+        """
+        features = util.Counter()
+        successor = self.get_successor(game_state, action)
+        features["successor_score"] = self.get_score(successor)
+        return features
+
+    def get_weights(self, game_state, action):
+        """
+        Normally, weights do not depend on the game state.  They can be either
+        a counter or a dictionary.
+        """
+        return {"successor_score": 1.0}
 
 
 def get_actions(goal_state, parents):
@@ -351,7 +393,7 @@ class GoalPlanner:
 class GoalPlannerOffensive(GoalPlanner):
     MAX_SAFE_DISTANCE = 8 # Max distance to an opponent ghost to be considered in safe mode
     BUFFER_ZONE_FROM_CENTER = 4 # Distance from the center of the board to consider the agent in a safe zone
-    TIME_LIMIT_FACTOR = 2 # Factor to determine the time limit to return to the center
+    TIME_LIMIT_FACTOR = 2.5 # Factor to determine the time limit to return to the center
     SAFETY_MARGIN = 3 # Distance to maintain from the closest ghost
     FOOD_FRAC_TO_RETREAT = 2 # Fraction of food remaining to retreat
     MAX_OFFENSE_DISTANCE = 2 # Max distance to an opponent ghost to be considered in offensive mode
@@ -363,10 +405,6 @@ class GoalPlannerOffensive(GoalPlanner):
         agent_is_pacman = game_state.get_agent_state(agent.index).is_pacman
         x_distance_to_center = abs(agent_pos[0] - game_state.data.layout.width // 2)
     
-        # Check if time is close to running out and we are winning so the agent becomes defensive
-        if GoalPlannerOffensive._is_time_up_become_defensive(agent, game_state):
-            agent.action_planner = GoalPlannerDefensive
-            return GoalPlannerOffensive._defensive_roaming_mode(agent, game_state)
         
         # Check if it's time to retreat based on the game timer or if if pacman is carrying sufficient food to return to the center
         if GoalPlannerOffensive._is_time_to_retreat(agent, game_state):
@@ -401,22 +439,6 @@ class GoalPlannerOffensive(GoalPlanner):
             center_of_our_side = bfs_until_non_wall(center_of_our_side, game_state)[-1]
 
         return center_of_our_side
-    
-    # Helper that after a certain time limit, the agent will become a defensive agent, if we are winning
-    @staticmethod
-    def _is_time_up_become_defensive(agent, game_state):
-
-        # Get current time left and calculate the time limit
-        time_left = game_state.data.timeleft
-        limit_time_to_back_to_center = GoalPlannerOffensive.TIME_LIMIT_FACTOR * (game_state.data.layout.height + game_state.data.layout.width)
-        time_up = time_left < limit_time_to_back_to_center
-
-        # Check if we are winning
-        score = game_state.get_score()
-        if agent.red == False:
-            score = -score
-
-        return time_up and score > 0
     
     @staticmethod
     def _is_time_to_retreat(agent, game_state):
@@ -646,14 +668,14 @@ class GoalPlannerOffensive(GoalPlanner):
             return center_of_our_side
 
 
-class OffensiveSwitchAStarAgent(ParticleFilterAgent):
+class OffensiveAStarAgent(CaptureAgent):
     def __init__(
-        self, index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing=0.1, action_planner=GoalPlannerOffensive
+        self, index, time_for_computing=0.1, action_planner=GoalPlannerOffensive
     ):
-        super().__init__(index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing)
-        ## HYPERPARAMETERS ##
-        self.OPPONENT_GHOST_WEIGHT = 5  # Cost for approaching an opponent ghost
-        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.5 # Attenuation factor for the cost based on distance to the opponent ghost
+        super().__init__(index, time_for_computing)
+        ## PENALTY FOR STATES WITH GHOSTS NEARBY
+        self.OPPONENT_GHOST_WEIGHT = 5  # Reward for approaching an opponent ghost
+        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.5 # Attenuation factor for the reward based on distance to the opponent ghost
         self.OPPONENT_PACMAN_WEIGHT = 7  # Reward for approaching an opponent pacman
         self.OPPONENT_PACMAN_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the opponent pacman
         self.POWER_PELLET_WEIGHT = 0.5  # Reward for approaching a power pellet
@@ -663,31 +685,23 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
         self.GHOST_COLLISION_PENALTY = 20  # Penalty for states closer to a previously known ghost location
         self.GHOST_COLLISION_DISTANCE_ATTENUATION = 0.2  # Attenuation factor for the penalty based on distance to the previously known ghost location
         self.EPSILON = 0.001  # Small value to avoid division by zero
+        self.start = None
         self.goal = None
         self.plan = None
         self.action_planner = action_planner
-        self.has_smart_defensive_offensive_capabilities = False
-        self.defensive_roaming_goal = None
-
 
     def register_initial_state(self, game_state):
-        super().register_initial_state(game_state)
+        self.start = game_state.get_agent_position(self.index)
+        CaptureAgent.register_initial_state(self, game_state)
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
         self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
 
     # Implements A* and executes the plan
     def choose_action(self, game_state):
-        self.update_particle_filter(game_state)
-        enemy_position_estimates = self.get_enemy_position_estimates()
-        enemy_distance_estimates = self.get_enemy_distance_estimates()
-
         # start_goal_calc = time.perf_counter()
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
         # print("Goal calc time: ", time.perf_counter() - start_goal_calc)
         # start_plan_calc = time.perf_counter()
-
-        # Fix goal if it is not legal
-        self._fix_goal_if_not_legal(game_state)
 
         self.plan = aStarSearch(
             agent=self,
@@ -752,26 +766,6 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
 
         return heuristic
     
-    # Helper function that fixes the goal if it is not legal
-    def _fix_goal_if_not_legal(self, game_state):
-        # If any of the coordinates of the goal is negative, set that coordinate to 0
-        if self.goal[0] < 0:
-            self.goal = (0, self.goal[1])
-        if self.goal[1] < 0:
-            self.goal = (self.goal[0], 0)
-
-        # If any of the coordinates of the goal is greater than the width or height of the board, set that coordinate to the width or height of the board
-        if self.goal[0] >= game_state.data.layout.width:
-            self.goal = (game_state.data.layout.width - 1, self.goal[1])
-        if self.goal[1] >= game_state.data.layout.height:
-            self.goal = (self.goal[0], game_state.data.layout.height - 1)
-
-        if is_legal_position(self.goal, game_state) == False:
-            self.goal = (
-                int(game_state.data.layout.width / 2),
-                int(game_state.data.layout.height / 2),
-            )
-
     # Helper function to categorize opponents into ghosts and pacmen
     def _categorize_opponents(self, game_state, opponent_team_members, profiling_dict=None):
         start_time = time.perf_counter() if profiling_dict is not None else None
@@ -898,7 +892,6 @@ class GoalPlannerDefensive(GoalPlanner):
     LIMIT_TIMER_SMART_OFFENSIVE = 50
     LIMIT_SMART_OFFENSIVE_CLOSE_FOOD = 6
     SMART_OFFENSIVE_CLOSE_FOOD_MULTIPLIER = 2.5
-    GET_AWAY_FROM_ALLY_GHOSTS_DISTANCE = 6
     
     @staticmethod
     def compute_goal(agent, game_state):
@@ -924,36 +917,22 @@ class GoalPlannerDefensive(GoalPlanner):
             k: v for k, v in enemy_pacman_positions.items() if v is not None
         }
 
-        # Distance to center
-        x_distance_to_center = abs(agent_pos[0] - game_state.data.layout.width // 2)
-
         # Enemy Ghost Positions
         enemy_ghost_positions = {
             opponent: game_state.get_agent_position(opponent)
             for opponent in agent.get_opponents(game_state)
-            if not game_state.get_agent_state(opponent).is_pacman and game_state.get_agent_state(opponent).scared_timer == 0
+            if not game_state.get_agent_state(opponent).is_pacman
         }
-
         # Remove None values
         enemy_ghost_positions = {
             k: v for k, v in enemy_ghost_positions.items() if v is not None
         }
-
-        # Ally Ghost Positions
-        ally_ghost_positions = {
-            teammate: game_state.get_agent_position(teammate)
-            for teammate in agent.get_team(game_state)
-            if not game_state.get_agent_state(teammate).is_pacman and game_state.get_agent_state(teammate).scared_timer == 0
-        }
-
         
-        # Smart offensive only if agent has smart offensive capabilities
-        if agent.has_smart_defensive_offensive_capabilities:
-            # Smart Offensive Mode Goal: If the agent has eaten an enemy pacman and there's not another enemy pacman nearby and is close to the center of the board (vertical line), if there are any
-            # close food pellets in the enemy side of the board, go for them up to a limit of 10% of the total food pellets in the enemy side of the board
-            smart_offensive_goal = GoalPlannerDefensive._has_eaten_enemy_pacman_and_no_other_close_enemies(game_state, agent, agent_is_pacman, agent_pos, agent_state, enemy_ghost_positions, x_distance_to_center)
-            if smart_offensive_goal:
-                return smart_offensive_goal
+        # Smart Offensive Mode Goal: If the agent has eaten an enemy pacman and there's not another enemy pacman nearby and is close to the center of the board (vertical line), if there are any
+        # close food pellets in the enemy side of the board, go for them up to a limit of 10% of the total food pellets in the enemy side of the board
+        smart_offensive_goal = GoalPlannerDefensive._has_eaten_enemy_pacman_and_no_other_close_enemies(game_state, agent, agent_is_pacman, agent_pos, agent_state)
+        if smart_offensive_goal:
+            return smart_offensive_goal
                     
         
         # Evade Invader Goal: If the Agent is Scared, is a Ghost and can see an invader, set the goal to evade the invader by a safe distance margin
@@ -972,15 +951,14 @@ class GoalPlannerDefensive(GoalPlanner):
             return recently_eaten_food_goal
     
         
-        # Default goal: Roaming Logic to get close to the center of the board in order to block enemy advances and get ready for smart offensives,
-        # trying to get away from ally ghosts
-        return GoalPlannerDefensive._default_goal(agent, game_state, center_of_board, agent_pos, ally_ghost_positions)
+        # Default goal: Roaming Logic to get close to the center of the board in order to block enemy advances and get ready for smart offensives
+        return GoalPlannerDefensive._default_goal(agent, game_state, center_of_board)
     
 
     # Smart Offensive Mode: If the agent has eaten an enemy pacman and there's not another enemy pacman nearby and is close to the center of the board (vertical line), if there are any
     # close food pellets in the enemy side of the board, go for them up to a limit of 10% of the total food pellets in the enemy side of the board
     @staticmethod
-    def _has_eaten_enemy_pacman_and_no_other_close_enemies(game_state, agent, agent_is_pacman, agent_pos, agent_state, opponent_ghosts_positions, x_distance_to_center):
+    def _has_eaten_enemy_pacman_and_no_other_close_enemies(game_state, agent, agent_is_pacman, agent_pos, agent_state):
         if agent._has_eaten_enemy_pacman_and_no_other_close_enemies(game_state) and agent._is_close_to_center(game_state, GoalPlannerDefensive.LIMIT_SMART_OFFENSIVE_CLOSE_FOOD):
             agent.smart_offensive_mode = True
             agent.smart_offensive_timer = 0
@@ -989,27 +967,7 @@ class GoalPlannerDefensive(GoalPlanner):
             agent.smart_offensive_mode = False
             agent.smart_offensive_timer = 0
 
-
         if agent.smart_offensive_mode:
-            # Retreat logic from GoalPlannerOffensive
-            # Constants
-            MAX_SAFE_DISTANCE = GoalPlannerOffensive.MAX_SAFE_DISTANCE
-            BUFFER_ZONE_FROM_CENTER = GoalPlannerOffensive.BUFFER_ZONE_FROM_CENTER
-
-            # Find the closest opponent ghost
-            closest_ghost_distance, closest_ghost_position = None, None
-            for ghost, pos in opponent_ghosts_positions.items():
-                distance = agent.get_maze_distance(agent_pos, pos)
-                if closest_ghost_distance is None or distance < closest_ghost_distance:
-                    closest_ghost_distance, closest_ghost_position = distance, pos
-
-            # Determine if the agent needs to avoid the closest ghost
-            if closest_ghost_distance and closest_ghost_distance <= MAX_SAFE_DISTANCE:
-                if agent_is_pacman or (not agent_is_pacman and x_distance_to_center <= BUFFER_ZONE_FROM_CENTER):
-                    # Calculate safe position to retreat
-                    # This can be a predefined safe location or dynamically calculated
-                    return GoalPlannerOffensive._calculate_safe_retreat(agent, game_state, closest_ghost_position)
-
             enemy_food = agent.get_food(game_state).as_list()
             enemy_food_limit = int(len(enemy_food) * GoalPlannerDefensive.PERCENTAGE_FOOD_PELLETS_SMART_OFFENSIVE)  # 10% of enemy food pellets
 
@@ -1098,7 +1056,6 @@ class GoalPlannerDefensive(GoalPlanner):
                                 closest_invader_pos[0],
                                 closest_invader_pos[1] - GoalPlannerDefensive.SAFE_DISTANCE,
                             )
-                        
 
                 return bfs_until_non_wall(closest_safe_position, game_state)[-1]
             
@@ -1142,14 +1099,7 @@ class GoalPlannerDefensive(GoalPlanner):
     # are defined as being close to the border up to a distance between 2 and 5 of the center line of the board.
     # Determine the border range based on the agent's side (red or blue)
     @staticmethod
-    def _default_goal(agent, game_state, center_of_board, agent_pos, ally_ghost_positions):
-        if agent.defensive_roaming_goal:
-            if agent_pos == agent.defensive_roaming_goal:
-                agent.defensive_roaming_goal = None
-
-            if agent.defensive_roaming_goal:
-                return agent.defensive_roaming_goal
-        
+    def _default_goal(agent, game_state, center_of_board):
         if agent.red:
             border_x = range(center_of_board[0] - GoalPlannerDefensive.ROAM_LIMIT_MAX, center_of_board[0] - GoalPlannerDefensive.ROAM_LIMIT_MIN)
         else:
@@ -1162,22 +1112,7 @@ class GoalPlannerDefensive(GoalPlanner):
                 if not game_state.has_wall(x, y):
                     potential_goals.append((x, y))
 
-        non_close_to_allies_potential_goals = [goal for goal in potential_goals]
-        # Remove positions from the list of potential goals that are too close to ally ghosts
-        for ally_ghost_pos in ally_ghost_positions.values():
-            if ally_ghost_pos:
-                non_close_to_allies_potential_goals = [
-                    goal
-                    for goal in non_close_to_allies_potential_goals
-                    if agent.get_maze_distance(goal, ally_ghost_pos) > GoalPlannerDefensive.GET_AWAY_FROM_ALLY_GHOSTS_DISTANCE
-                ]
-
-        # If there are potential goals that are not too close to ally ghosts, choose a random one and set a roaming goal
-        if non_close_to_allies_potential_goals:
-            agent.defensive_roaming_goal = random.choice(non_close_to_allies_potential_goals)
-            return agent.defensive_roaming_goal
-
-        # Choose a random goal from the list of potential goals if the previous check fails
+        # Choose a random goal from the list of potential goals
         if potential_goals:
             return random.choice(potential_goals)
         
@@ -1195,19 +1130,7 @@ class DefensiveAStarAgent(CaptureAgent):
         self.plan = None
         self.smart_offensive_mode = False
         self.smart_offensive_timer = 0
-        self.has_smart_defensive_offensive_capabilities = True
-        self.defensive_roaming_goal = None
         self.action_planner = action_planner
-
-        ## HYPERPARAMETERS ##
-        self.OPPONENT_GHOST_WEIGHT = 5  # Cost for approaching an opponent ghost
-        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.5 # Attenuation factor for the cost based on distance to the opponent ghost
-        self.OPPONENT_PACMAN_WEIGHT = 7  # Reward for approaching an opponent pacman
-        self.OPPONENT_PACMAN_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the opponent pacman
-        self.ALLY_GHOST_WEIGHT = 5  # Cost for approaching an ally ghost
-        self.ALLY_GHOST_WEIGHT_ATTENUATION = 0.5 # Attenuation factor for the cost based on distance to the ally ghost
-        self.ALLY_PACMAN_WEIGHT = 7  # Cost for approaching an ally pacman
-        self.ALLY_PACMAN_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the cost based on distance to the ally pacman
 
     def register_initial_state(self, game_state):
         self.start = game_state.get_agent_position(self.index)
@@ -1221,10 +1144,6 @@ class DefensiveAStarAgent(CaptureAgent):
             self.smart_offensive_timer += 1
 
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
-
-        # Fix goal if it is not legal
-        self._fix_goal_if_not_legal(game_state)
-
         self.plan = aStarSearch(
             agent=self,
             goal=self.goal,
@@ -1254,67 +1173,13 @@ class DefensiveAStarAgent(CaptureAgent):
         else:
             return random.choice(actions)
 
-    def defensive_heuristic(self, agent, goal, game_state, track_heuristics=True, enable_profiling=False):
+    def defensive_heuristic(self, agent, goal, game_state):
+
         heuristic = 0
-        profiling_dict = {}
-        heuristic_effect_dict = {}
 
-        if enable_profiling:
-            start_time = time.perf_counter()
-
-        agent_pos = game_state.get_agent_position(agent.index)
         agent_is_pacman = game_state.get_agent_state(agent.index).is_pacman
-        opponent_team_members = agent.get_opponents(game_state)
-
-        # Categorize allies and adjust heuristic
-        ally_ghost_distances, ally_pacman_distances = self._categorize_allies(game_state, opponent_team_members, profiling_dict if enable_profiling else None)
-        heuristic += self._adjust_heuristic_for_allies(agent_is_pacman, ally_ghost_distances, ally_pacman_distances, heuristic_effect_dict if track_heuristics else None)
-
-        # Categorize opponents and adjust heuristic
-        opponent_ghost_distances, opponent_pacman_distances = self._categorize_opponents(game_state, opponent_team_members, profiling_dict if enable_profiling else None)
-        heuristic += self._adjust_heuristic_for_opponents(agent_is_pacman, opponent_ghost_distances, opponent_pacman_distances, heuristic_effect_dict if track_heuristics else None)
-
-        if enable_profiling:
-            profiling_dict['total_time'] = time.perf_counter() - start_time
 
         return heuristic
-    
-    # Helper function that fixes the goal if it is not legal
-    def _fix_goal_if_not_legal(self, game_state):
-        # If any of the coordinates of the goal is negative, set that coordinate to 0
-        if self.goal[0] < 0:
-            self.goal = (0, self.goal[1])
-        if self.goal[1] < 0:
-            self.goal = (self.goal[0], 0)
-
-        # If any of the coordinates of the goal is greater than the width or height of the board, set that coordinate to the width or height of the board
-        if self.goal[0] > game_state.data.layout.width:
-            self.goal = (game_state.data.layout.width, self.goal[1])
-        if self.goal[1] > game_state.data.layout.height:
-            self.goal = (self.goal[0], game_state.data.layout.height)
-
-        if is_legal_position(self.goal, game_state) == False:
-            self.goal = (
-                int(game_state.data.layout.width / 2),
-                int(game_state.data.layout.height / 2),
-            )
-
-    def _categorize_allies(self, game_state, ally_team_members, profiling_dict=None):
-        start_time = time.perf_counter() if profiling_dict is not None else None
-
-        ally_ghost_distances = {}
-        ally_pacman_distances = {}
-        for member in ally_team_members:
-            distance = game_state.agent_distances[member]
-            if game_state.get_agent_state(member).is_pacman:
-                ally_pacman_distances[member] = distance
-            else:
-                ally_ghost_distances[member] = distance
-
-        if profiling_dict is not None:
-            profiling_dict['_categorize_allies'] = time.perf_counter() - start_time
-
-        return ally_ghost_distances, ally_pacman_distances
     
     # Helper function to check if the agent has eaten an enemy pacman and there are no other close enemies
     def _has_eaten_enemy_pacman_and_no_other_close_enemies(self, game_state):
@@ -1409,37 +1274,78 @@ class DefensiveAStarAgent(CaptureAgent):
 
         return opponent_ghost_distances, opponent_pacman_distances
 
-    # Helper function to adjust the heuristic based on the opponents
-    def _adjust_heuristic_for_opponents(self, agent_is_pacman, opponent_ghost_distances, opponent_pacman_distances, heuristic_effect_dict=None):
-        heuristic = 0
-        if agent_is_pacman and opponent_ghost_distances:
-            closest_ghost_distance = min(opponent_ghost_distances.values())
-            heuristic += self.OPPONENT_GHOST_WEIGHT / (max(closest_ghost_distance, 1) ** self.OPPONENT_GHOST_WEIGHT_ATTENUATION)
-            if heuristic_effect_dict is not None:
-                heuristic_effect_dict['opponent_ghost'] = heuristic
+class OffensiveReflexAgent(ReflexCaptureAgent):
+    """
+    A reflex agent that seeks food. This is an agent
+    we give you to get an idea of what an offensive agent might look like,
+    but it is by no means the best or only way to build an offensive agent.
+    """
 
-        if not agent_is_pacman and opponent_pacman_distances:
-            closest_pacman_distance = min(opponent_pacman_distances.values())
-            heuristic -= self.OPPONENT_PACMAN_WEIGHT / (max(closest_pacman_distance, 1) ** self.OPPONENT_PACMAN_WEIGHT_ATTENUATION)
-            if heuristic_effect_dict is not None:
-                heuristic_effect_dict['opponent_pacman'] = heuristic
+    def get_features(self, game_state, action):
+        features = util.Counter()
+        successor = self.get_successor(game_state, action)
+        food_list = self.get_food(successor).as_list()
+        features["successor_score"] = -len(food_list)  # self.getScore(successor)
 
-        return heuristic
-    
-    # Helper function to adjust the heuristic based on the allies
-    def _adjust_heuristic_for_allies(self, agent_is_pacman, ally_ghost_distances, ally_pacman_distances, heuristic_effect_dict=None):
-        heuristic = 0
-        if agent_is_pacman and ally_ghost_distances:
-            closest_ghost_distance = min(ally_ghost_distances.values())
-            heuristic += self.ALLY_GHOST_WEIGHT / (max(closest_ghost_distance, 1) ** self.ALLY_GHOST_WEIGHT_ATTENUATION)
-            if heuristic_effect_dict is not None:
-                heuristic_effect_dict['ally_ghost'] = heuristic
+        # Compute distance to the nearest food
 
-        if not agent_is_pacman and ally_pacman_distances:
-            closest_pacman_distance = min(ally_pacman_distances.values())
-            heuristic += self.ALLY_PACMAN_WEIGHT / (max(closest_pacman_distance, 1) ** self.ALLY_PACMAN_WEIGHT_ATTENUATION)
-            if heuristic_effect_dict is not None:
-                heuristic_effect_dict['ally_pacman'] = heuristic
+        if (
+            len(food_list) > 0
+        ):  # This should always be True,  but better safe than sorry
+            my_pos = successor.get_agent_state(self.index).get_position()
+            min_distance = min(
+                [self.get_maze_distance(my_pos, food) for food in food_list]
+            )
+            features["distance_to_food"] = min_distance
+        return features
 
-        return heuristic
+    def get_weights(self, game_state, action):
+        return {"successor_score": 100, "distance_to_food": -1}
 
+
+class DefensiveReflexAgent(ReflexCaptureAgent):
+    """
+    A reflex agent that keeps its side Pacman-free. Again,
+    this is to give you an idea of what a defensive agent
+    could be like.  It is not the best or only way to make
+    such an agent.
+    """
+
+    def get_features(self, game_state, action):
+        features = util.Counter()
+        successor = self.get_successor(game_state, action)
+
+        my_state = successor.get_agent_state(self.index)
+        my_pos = my_state.get_position()
+
+        # Computes whether we're on defense (1) or offense (0)
+        features["on_defense"] = 1
+        if my_state.is_pacman:
+            features["on_defense"] = 0
+
+        # Computes distance to invaders we can see
+        enemies = [successor.get_agent_state(i) for i in self.get_opponents(successor)]
+        invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
+        features["num_invaders"] = len(invaders)
+        if len(invaders) > 0:
+            dists = [self.get_maze_distance(my_pos, a.get_position()) for a in invaders]
+            features["invader_distance"] = min(dists)
+
+        if action == Directions.STOP:
+            features["stop"] = 1
+        rev = Directions.REVERSE[
+            game_state.get_agent_state(self.index).configuration.direction
+        ]
+        if action == rev:
+            features["reverse"] = 1
+
+        return features
+
+    def get_weights(self, game_state, action):
+        return {
+            "num_invaders": -1000,
+            "on_defense": 100,
+            "invader_distance": -10,
+            "stop": -100,
+            "reverse": -2,
+        }
