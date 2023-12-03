@@ -73,10 +73,10 @@ def bfs_until_non_wall(start, game_state):
         start = (start[0], 0)
 
     # Correct start if its coordinates are greater than the width or height of the board
-    if start[0] > game_state.data.layout.width:
-        start = (game_state.data.layout.width, start[1])
-    if start[1] > game_state.data.layout.height:
-        start = (start[0], game_state.data.layout.height)
+    if start[0] >= game_state.data.layout.width:
+        start = (game_state.data.layout.width - 1, start[1])
+    if start[1] >= game_state.data.layout.height:
+        start = (start[0], game_state.data.layout.height - 1)
         
     # Define movements: right, left, up, down
     movements = [(1, 0), (-1, 0), (0, 1), (0, -1)]
