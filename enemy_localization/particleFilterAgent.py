@@ -44,7 +44,9 @@ class ParticleFilterAgent(CaptureAgent):
         # initialize enemy position particle filters
         if not self.enemyPositionParticleFilters:
             for enemy in self.enemies:
-                self.enemyPositionParticleFilters[enemy] = EnemyPositionParticleFilter(num_particles=500, 
+                self.enemyPositionParticleFilters[enemy] = EnemyPositionParticleFilter(
+                                               num_particles=500, 
+                                               noisy_distances_buffer_length=10,
                                                walls=game_state.get_walls(), 
                                                initial_position=game_state.get_agent_position(enemy),
                                                tracked_enemy_index=enemy)

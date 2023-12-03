@@ -11,13 +11,13 @@ _LOGGING = False
 # TODO check runtime of particle filter, add way to scale down or completely 
 # shut down if it takes too much time and we risk defaulting game bc of that (1 sec max per turn I think)
 class EnemyPositionParticleFilter:
-    def __init__(self, num_particles, walls, initial_position, tracked_enemy_index, max_noisy_estimates=10):
+    def __init__(self, num_particles, noisy_distances_buffer_length, walls, initial_position, tracked_enemy_index):
         # Distributions based on noisy measurements, not actual particle positions
         # probability distributions of possible positions calculated from noisy distance estimates and agent position
         # this is used as further input to update the belief (particles) of the particle filter
         initial_position_distribution = np.zeros((walls.width, walls.height))
         initial_position_distribution[initial_position] = 1
-        self.noisy_position_distributions = deque([np.copy(initial_position_distribution) for _ in range(max_noisy_estimates)], maxlen=max_noisy_estimates)
+        self.noisy_position_distributions = deque([np.copy(initial_position_distribution) for _ in range(noisy_distances_buffer_length)], maxlen=noisy_distances_buffer_length)
 
         # dtype needs to be float because scared ghosts move slower (0.5), normal speed is 1.0 
         self.particles = np.full((num_particles, 2), initial_position, dtype=float)
