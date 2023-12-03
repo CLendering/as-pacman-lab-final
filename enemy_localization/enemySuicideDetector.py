@@ -12,7 +12,7 @@ class EnemySuicideDetector():
 
     def initialize(self, enemies, agents_on_team, team_spawn_positions):
         if self.initialized:
-            print('EnemySuicideDetector.initialize was called although it was already initialized before')
+            print('ESD.initialize was called although it was already initialized before')
         self.enemies = enemies
         self.agentsOnTeam = agents_on_team
         self.teamSpawnPositions = team_spawn_positions

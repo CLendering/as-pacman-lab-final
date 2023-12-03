@@ -67,7 +67,7 @@ class EnemyPositionParticleFilter:
 
 
         if _LOGGING:
-            self.logger = logging.getLogger(f'EnemyPositionParticleFilter (enemy {tracked_enemy_index})')
+            self.logger = logging.getLogger(f'EPPF (enemy {tracked_enemy_index})')
             self.logger.setLevel(logging.WARNING)
             self.logger.addHandler(console_log_handler)
             self.estimated_positions_logger = logging.getLogger(f'estimated positions enemy {tracked_enemy_index})')

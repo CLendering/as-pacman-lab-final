@@ -8,13 +8,13 @@ class OwnFoodSupervisor():
     """
     def __init__(self):
         self.initialized = False
-        self.logger = logging.getLogger('OwnFoodSupervisor)')
+        self.logger = logging.getLogger('OFS)')
         self.logger.setLevel(logging.DEBUG)
         self.logger.addHandler(console_log_handler)
     
     def initialize(self, initial_own_food, initial_own_capsules, total_agents):
         if self.initialized:
-            self.logger.critical('OwnFoodSupervisor.initialize was called although it was already initialized before')
+            self.logger.critical('OFS.initialize was called although it was already initialized before')
         self.initialized = True
         self.lastOwnFood = np.array(initial_own_food.data) # initial_own_food is of type contest.Game.grid -> data property has list data
         self.lastOwnCapsules = set(initial_own_capsules) # initial_own_capsules is a list of tuples
@@ -39,12 +39,16 @@ class OwnFoodSupervisor():
             self._localized_enemy_position = (x[0], y[0])
             self._localized_enemy_index = (agent_index - 1) % self.totalAgents
         elif self.lastOwnCapsules != own_capsules:
-            self._localized_enemy_position = list(self.lastOwnCapsules.difference(own_capsules))[0]
-            self._localized_enemy_index = (agent_index - 1) % self.totalAgents
-            self.lastOwnCapsules = own_capsules
+            differenceCapsules = list(self.lastOwnCapsules.difference(own_capsules))
+            if len(differenceCapsules) == 1:
+                self._localized_enemy_position = differenceCapsules[0]
+                self._localized_enemy_index = (agent_index - 1) % self.totalAgents
+            else:
+                self.logger.critical('Wtf? last={self.lastOwnCapsules}, now={own_capsules}, d={differenceCapsules}')
     
-        # Update own food
+        # Update own food and capsules
         np.copyto(self.lastOwnFood, own_food)
+        self.lastOwnCapsules = own_capsules
     
     
     def canLocalizeEnemy(self, index):
