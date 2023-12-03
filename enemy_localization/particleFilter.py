@@ -156,9 +156,10 @@ class EnemyPositionParticleFilter:
         self.__resample_particles(condensed_position_distribution)
 
     
-    def estimate_position(self):
+    def estimate_distinct_position(self):
         """
         Estimate the position as the mean of the particle distribution.
+        Returns a single position.
         """
         mean_position = np.rint(np.mean(self.particles, axis=0)).astype(int)
         # Check if mean position is valid
@@ -181,6 +182,20 @@ class EnemyPositionParticleFilter:
         if self.walls[nearest_position[0]][nearest_position[1]]:
             raise "WTF"
         return tuple(nearest_position)
+
+    def estimate_probabilistic_position(self):
+        """
+        Generate a probabilistic position estimate based on the particle filter data.
+        Returns a array of positions where the value at each position is the probability of that position.
+        """
+        probability_distribution = np.zeros((self.walls.width, self.walls.height))
+
+        unique_positions, counts = np.unique(np.rint(self.particles).astype(int), axis=0, return_counts=True)
+
+        for i, position in enumerate(unique_positions):
+            probability_distribution[tuple(position)] = counts[i] / self.num_particles
+
+        return probability_distribution
 
     def __update_noisy_position_distributions(self, agent_position, noisy_distance, is_pacman):
         """

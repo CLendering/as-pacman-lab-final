@@ -23,7 +23,8 @@
 from contest.captureAgents import CaptureAgent
 from enemy_localization.particleFilter import EnemyPositionParticleFilter
 from contest.util import manhattanDistance
-
+from collections import defaultdict
+import numpy as np
 
 
 class ParticleFilterAgent(CaptureAgent):
@@ -94,9 +95,50 @@ class ParticleFilterAgent(CaptureAgent):
             else:
                 pf.update_with_noisy_distance(self.own_position, noisy_distances[enemy_index], enemy_is_pacman)
 
-    def get_enemy_position_estimates(self):
-        return [self.enemyPositionParticleFilters[enemy].estimate_position() for enemy in sorted(self.enemyPositionParticleFilters.keys())]
+    def get_distinct_enemy_position_estimates(self):
+        """
+        Get a list of estimated enemy positions.
+        Estimates the position for each enemy as the mean of the particle distribution.
+        Returns a single position for each enemy.        
+        """
+        return [self.enemyPositionParticleFilters[enemy].estimate_distinct_position() for enemy in sorted(self.enemyPositionParticleFilters.keys())]
     
-    def get_enemy_distance_estimates(self):
-        enemy_position_estimates = self.get_enemy_position_estimates()
-        return [manhattanDistance(self.own_position, enemy_position) for enemy_position in enemy_position_estimates]
+    def get_distinct_enemy_distance_estimates(self):
+        """
+        Get a list of estimated enemy distances.
+        Estimates the position for each enemy as the mean of the particle distribution
+        and calculates the distance from that.
+        Returns a single distance for each enemy.        
+        """
+        distinct_enemy_position_estimates = self.get_distinct_enemy_position_estimates()
+        return [manhattanDistance(self.own_position, enemy_position) for enemy_position in distinct_enemy_position_estimates]
+
+    def get_probabilistic_enemy_position_estimates(self):
+        """
+        Get probabilistic position estimates.
+        Returns a array of positions where the value at each position is the probability of that position.
+        """
+        return [self.enemyPositionParticleFilters[enemy].estimate_probabilistic_position() for enemy in sorted(self.enemyPositionParticleFilters.keys())]
+    
+    def get_probabilistic_enemy_distance_estimates(self):
+        """
+        Generate probabilistic distance estimates.
+        Returns a list of dicts (1 dict for each enemy).
+        Each dict maps a distance to a probability.
+        """
+        # List of dicts for each enemy
+        # Each dict maps a distance to a probability
+        probabilistic_distance_estimates = [defaultdict(int) for _ in range(len(self.enemies))]
+        
+        for i_enemy, probabilistic_enemy_position_estimate in enumerate(self.get_probabilistic_enemy_position_estimates()):
+            x, y = probabilistic_enemy_position_estimate.nonzero()
+
+            # Distance x Probability matrix, each entry is a tuple (distance, probability)
+            distance_probability_distribution = np.empty((len(x), len(x)), dtype="i,f") # distance is int. probability is float
+            # Fill matrix with manhattan distances and probabilities
+            for i, enemy_position in enumerate(zip(x, y)):
+                probability = probabilistic_enemy_position_estimate[enemy_position]
+                distance = manhattanDistance(self.own_position, enemy_position)
+                probabilistic_distance_estimates[i_enemy][distance] += probability
+            
+        return probabilistic_distance_estimates

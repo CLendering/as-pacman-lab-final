@@ -37,10 +37,20 @@ class DefensiveAStarAgent(ParticleFilterAgent):
     # Implements A* and executes the plan
     def choose_action(self, game_state):
         self.update_particle_filter(game_state)
-        enemy_position_estimates = self.get_enemy_position_estimates()
-        enemy_distance_estimates = self.get_enemy_distance_estimates()
-        # TODO use enemy position/distance estimates
+        enemy_position_estimates = self.get_distinct_enemy_position_estimates()
+        enemy_distance_estimates = self.get_distinct_enemy_distance_estimates()
+        enemy_probabilistic_positions_estimates = self.get_probabilistic_enemy_position_estimates()
+        enemy_probabilistic_distances_estimates = self.get_probabilistic_enemy_distance_estimates()
 
+        # TODO use enemy position/distance estimates, e.g. like this:
+        # for pos, prob in np.ndenumerate(enemy_probabilistic_positions_estimates[0]):
+        #     # Now pos is a tuple of the position (x,y) of the first enemy and prob is the probability of that position
+        #     pass
+        # for distance, prob in enemy_probabilistic_distances_estimates[0].items():
+        #    # Now distance is the distance to the first enemy and prob is the probability of that distance
+        #    pass
+
+        
         if self.smart_offensive_mode:
             self.smart_offensive_timer += 1
 
