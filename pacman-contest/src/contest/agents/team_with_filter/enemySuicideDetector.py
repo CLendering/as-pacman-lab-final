@@ -10,12 +10,12 @@ class EnemySuicideDetector():
     def __init__(self):
         self.initialized = False
 
-    def initialize(self, enemies, agentsOnTeam, teamSpawnPositions):
+    def initialize(self, enemies, agents_on_team, team_spawn_positions):
         if self.initialized:
             print('EnemySuicideDetector.initialize was called although it was already initialized before')
         self.enemies = enemies
-        self.agentsOnTeam = agentsOnTeam
-        self.teamSpawnPositions = teamSpawnPositions
+        self.agentsOnTeam = agents_on_team
+        self.teamSpawnPositions = team_spawn_positions
         self.enemiesToCloseAgentsOnTeam = {enemy: set() for enemy in enemies}
         self.__enemySuicides = {enemy: False for enemy in enemies}
 

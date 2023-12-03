@@ -36,6 +36,9 @@ from contest.agents.team_with_filter.enemySuicideDetector import EnemySuicideDet
 enemyPositionParticleFilters = dict()
 
 
+np.seterr(all='raise')
+
+
 #################
 # Team creation #
 #################
@@ -112,6 +115,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
         # remember who the real enemy is
         self.enemies = self.get_opponents(game_state)
+        self.totalAgents = len(game_state.teams)
 
 
 
@@ -127,16 +131,14 @@ class ReflexCaptureAgent(CaptureAgent):
         if not ownFoodSupervisor.initialized:
             own_food = self.get_food_you_are_defending(game_state)
             own_capsules = self.get_capsules_you_are_defending(game_state)
-            ownFoodSupervisor.initialize(own_food, own_capsules, self.enemies)
+            ownFoodSupervisor.initialize(own_food, own_capsules, self.totalAgents)
 
         global enemySuicideDetector
         if not enemySuicideDetector.initialized:
             team_spawn_positions = {agentOnTeam: game_state.get_initial_agent_position(agentOnTeam) for agentOnTeam in self.agentsOnTeam}
             enemySuicideDetector.initialize(self.enemies, self.agentsOnTeam, team_spawn_positions)
 
-        # TODO move to ownFoodSupervisor
-        self.last_food_you_are_defending = None
-        
+
     def get_exact_opponent_distances(self, game_state): 
         agent_pos = game_state.get_agent_position(self.index)
         enemy_positions = [game_state.get_agent_position(i) for i in self.enemies]
@@ -152,15 +154,21 @@ class ReflexCaptureAgent(CaptureAgent):
         """
         - Moves the particles of the preceding enemy's filter
         - Updates particle weights and resamples particles of every enemy's filter with exact position or noisy distance estimate
-        """
-        global enemyPositionParticleFilters
+        """ 
+        global ownFoodSupervisor
+        ownFoodSupervisor.update(self.index, self.get_food_you_are_defending(game_state), self.get_capsules_you_are_defending(game_state))
+
+        # IMPORTANT! Suicide Detector must be updated before particle filter!
         global enemySuicideDetector
+        enemySuicideDetector.update(game_state)
+
+        global enemyPositionParticleFilters
 
         # Update the particle filter of the preceding enemy
         # only if it's not the very first move of the game (i.e. 1200 steps are left)
         if game_state.data.timeleft != 1200:
             # Determine the index of the enemy who just moved
-            enemy_who_just_moved = (self.index - 1) % len(game_state.teams)
+            enemy_who_just_moved = (self.index - 1) % self.totalAgents
             # move particles of filter one time step into the future
             enemyPositionParticleFilters[enemy_who_just_moved].move_particles()
 
@@ -180,14 +188,14 @@ class ReflexCaptureAgent(CaptureAgent):
             # if enemy agent committed suicide, reset him to his spawn
             elif enemySuicideDetector.hasCommittedSuicide(enemy_index):
                 if game_state.data._eaten[enemy_index]:
-                    raise 'wtf is this'
+                    raise 'wtf is this' # TODO remove, it works now
                 pf.reset_to_spawn()
-            # if enemy agent is not seen directly, update particle filter with noisy distance
+            elif ownFoodSupervisor.canLocalizeEnemy(enemy_index):
+                assert enemy_is_pacman, "He should be if he just ate ..." # TODO remove
+                pf.update_with_exact_position(ownFoodSupervisor.localizeEnemy(), is_pacman=True)
+            # if enemy agent is not seen, update particle filter with noisy distance
             else:
                 pf.update_with_noisy_distance(agent_position, noisy_distances[enemy_index], enemy_is_pacman)
-            
-            # Logging
-            # TODO
 
 
     def choose_action(self, game_state):
@@ -195,45 +203,6 @@ class ReflexCaptureAgent(CaptureAgent):
         Picks among the actions with the highest Q(s,a).
         """
         self.logger.info(f"Turn starts")
-
-
-
-        # bf=game_state.get_blue_food()
-        # rf=game_state.get_red_food()
-        # bc=game_state.get_blue_capsules()
-        # rc=game_state.get_red_capsules()
-        # c = game_state.get_capsules()
-        # hasfood= game_state.has_food(0,0)
-
-        # food= self.get_food(game_state)
-        # own_food = self.get_food_you_are_defending(game_state)
-        # capsules = self.get_capsules(game_state)
-        # own_capsules = self.get_capsules_you_are_defending(game_state)
-
-        # TODO: do same with capsules 
-
-        # TODO do this check in a class that is shared by both agents (so it can update the particle filters more frequently)
-        # and then update pf of enemy with closest position to missing food 
-        food_you_are_defending = self.get_food_you_are_defending(game_state)
-        if self.last_food_you_are_defending is not None:
-            if self.last_food_you_are_defending != food_you_are_defending:
-                enemy_positions = (np.array(self.last_food_you_are_defending.data) != np.array(food_you_are_defending.data)).nonzero()
-                # tuple with 2 elements
-                #   -> 1st element: np.array of x indices of food that is gone now
-                #   -> 2nd element: np.array of y indices of food that is gone now
-                # TODO LET'S GOOO HERE
-                for enemy in self.enemies:
-                    # TODO use information of how num_carrying for each enemy changes
-                    # to find out which enemy is at the position of the missing food :)
-                    # TODO: figure out direction of enemy as well from this lol
-                    # probably easiest by getting the closest direction from this vector:
-                    # (missing food position - last enemy position estimate)
-                    
-                    game_state.get_agent_state(index=enemy).num_carrying
-
-
-        self.last_food_you_are_defending = food_you_are_defending
-            
 
         actions = game_state.get_legal_actions(self.index)
         noisy_distances = self.get_noisy_opponent_distances(game_state)
@@ -246,14 +215,9 @@ class ReflexCaptureAgent(CaptureAgent):
 
         agent_position = game_state.get_agent_position(self.index)
 
-        # IMPORTANT! Suicide Detector must be updated before particle filter!
-        global enemySuicideDetector
-        enemySuicideDetector.update(game_state)
-
-        global enemyPositionParticleFilters
-
         self.update_particle_filter(game_state)
         
+        global enemyPositionParticleFilters
         # get new estimates of enemy positions
         enemy_position_estimates = [enemyPositionParticleFilters[enemy].estimate_position() for enemy in sorted(enemyPositionParticleFilters.keys())]
         enemy_distance_estimates = [manhattanDistance(agent_position, enemy_pos) for enemy_pos in enemy_position_estimates]
