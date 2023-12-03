@@ -819,10 +819,10 @@ class OffensiveSwitchAStarAgent(CaptureAgent):
             self.goal = (self.goal[0], 0)
 
         # If any of the coordinates of the goal is greater than the width or height of the board, set that coordinate to the width or height of the board
-        if self.goal[0] > game_state.data.layout.width:
-            self.goal = (game_state.data.layout.width, self.goal[1])
-        if self.goal[1] > game_state.data.layout.height:
-            self.goal = (self.goal[0], game_state.data.layout.height)
+        if self.goal[0] >= game_state.data.layout.width:
+            self.goal = (game_state.data.layout.width - 1, self.goal[1])
+        if self.goal[1] >= game_state.data.layout.height:
+            self.goal = (self.goal[0], game_state.data.layout.height - 1)
 
         if is_legal_position(self.goal, game_state) == False:
             self.goal = (
