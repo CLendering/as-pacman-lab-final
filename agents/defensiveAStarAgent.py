@@ -18,6 +18,11 @@ class DefensiveAStarAgent(ParticleFilterAgent):
         self.has_smart_defensive_offensive_capabilities = True
         self.defensive_roaming_goal = None
         self.action_planner = action_planner
+        self.opponents_indexes = None
+        self.enemy_position_estimates = None
+        self.enemy_distance_estimates = None
+        self.enemy_probabilistic_distances_estimates = None
+        self.enemy_probabilistic_positions_estimates = None
 
         ## HYPERPARAMETERS ##
         self.OPPONENT_GHOST_WEIGHT = 8  # Cost for approaching an opponent ghost
@@ -33,6 +38,7 @@ class DefensiveAStarAgent(ParticleFilterAgent):
         super().register_initial_state(game_state)
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
         self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
+        self.opponents_indexes = self.get_opponents(game_state)
 
     # Implements A* and executes the plan
     def choose_action(self, game_state):
@@ -42,14 +48,16 @@ class DefensiveAStarAgent(ParticleFilterAgent):
         enemy_probabilistic_positions_estimates = self.get_probabilistic_enemy_position_estimates()
         enemy_probabilistic_distances_estimates = self.get_probabilistic_enemy_distance_estimates()
 
-        # TODO use enemy position/distance estimates, e.g. like this:
-        # for pos, prob in np.ndenumerate(enemy_probabilistic_positions_estimates[0]):
-        #     # Now pos is a tuple of the position (x,y) of the first enemy and prob is the probability of that position
-        #     pass
-        # for distance, prob in enemy_probabilistic_distances_estimates[0].items():
-        #    # Now distance is the distance to the first enemy and prob is the probability of that distance
-        #    pass
+        # For the previous variables for the estimates, hold them in a dictionary with the enemy index as the key, knowing that the enemy index is not the same as those in the estimates, which follow the order of the opponents_indexes
+        enemy_position_estimates_dict = {self.opponents_indexes[i]: enemy_position_estimates[i] for i in range(len(self.opponents_indexes))}
+        enemy_distance_estimates_dict = {self.opponents_indexes[i]: enemy_distance_estimates[i] for i in range(len(self.opponents_indexes))}
+        enemy_probabilistic_positions_estimates_dict = {self.opponents_indexes[i]: enemy_probabilistic_positions_estimates[i] for i in range(len(self.opponents_indexes))}
+        enemy_probabilistic_distances_estimates_dict = {self.opponents_indexes[i]: enemy_probabilistic_distances_estimates[i] for i in range(len(self.opponents_indexes))}
 
+        self.enemy_position_estimates = enemy_position_estimates_dict
+        self.enemy_distance_estimates = enemy_distance_estimates_dict
+        self.enemy_probabilistic_positions_estimates = enemy_probabilistic_positions_estimates_dict
+        self.enemy_probabilistic_distances_estimates = enemy_probabilistic_distances_estimates_dict
         
         if self.smart_offensive_mode:
             self.smart_offensive_timer += 1
@@ -98,7 +106,7 @@ class DefensiveAStarAgent(ParticleFilterAgent):
 
         agent_pos = game_state.get_agent_position(agent.index)
         agent_is_pacman = game_state.get_agent_state(agent.index).is_pacman
-        opponent_team_members = agent.get_opponents(game_state)
+        opponent_team_members = agent.opponents_indexes
 
         # Categorize allies and adjust heuristic
         ally_ghost_distances, ally_pacman_distances = self._categorize_allies(game_state, opponent_team_members, profiling_dict if enable_profiling else None)
@@ -231,12 +239,23 @@ class DefensiveAStarAgent(ParticleFilterAgent):
 
         opponent_ghost_distances = {}
         opponent_pacman_distances = {}
-        for member in opponent_team_members:
-            distance = game_state.agent_distances[member]
-            if game_state.get_agent_state(member).is_pacman:
-                opponent_pacman_distances[member] = distance
-            else:
-                opponent_ghost_distances[member] = distance
+
+        # If estimates are available, use the non-probabilistic estimates
+        if self.enemy_position_estimates is not None and self.enemy_distance_estimates is not None:
+            for member in opponent_team_members:
+                distance = self.enemy_distance_estimates[member]
+                if self.enemy_position_estimates[member] is not None:
+                    if game_state.get_agent_state(member).is_pacman:
+                        opponent_pacman_distances[member] = distance
+                    else:
+                        opponent_ghost_distances[member] = distance
+        else:
+            for member in opponent_team_members:
+                distance = game_state.agent_distances[member]
+                if game_state.get_agent_state(member).is_pacman:
+                    opponent_pacman_distances[member] = distance
+                else:
+                    opponent_ghost_distances[member] = distance
 
         if profiling_dict is not None:
             profiling_dict['_categorize_opponents'] = time.perf_counter() - start_time
