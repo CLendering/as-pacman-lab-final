@@ -1,4 +1,4 @@
-from customLogging import *
+from enemy_localization.customLogging import logging, console_log_handler 
 import numpy as np
 
 

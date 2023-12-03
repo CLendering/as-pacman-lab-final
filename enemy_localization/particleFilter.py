@@ -1,19 +1,17 @@
 import numpy as np
-from customLogging import *
+from enemy_localization.customLogging import logging, console_log_handler, DeferredFileHandler
 from collections import deque
 from contest.capture import SONAR_NOISE_VALUES, SIGHT_RANGE
 from contest.pacman import GhostRules
 from contest.game import Directions, Configuration, Actions
 from contest.util import Counter
 
+_LOGGING = False
+
 # TODO check runtime of particle filter, add way to scale down or completely 
 # shut down if it takes too much time and we risk defaulting game bc of that (1 sec max per turn I think)
 class EnemyPositionParticleFilter:
     def __init__(self, num_particles, walls, initial_position, tracked_enemy_index, max_noisy_estimates=10):
-        self.logger = logging.getLogger(f'EnemyPositionParticleFilter (enemy {tracked_enemy_index})')
-        self.logger.setLevel(logging.WARNING)
-        self.logger.addHandler(console_log_handler)
-
         # Distributions based on noisy measurements, not actual particle positions
         # probability distributions of possible positions calculated from noisy distance estimates and agent position
         # this is used as further input to update the belief (particles) of the particle filter
@@ -68,19 +66,24 @@ class EnemyPositionParticleFilter:
         self.all_columns_except_border_of_enemy_team = np.setdiff1d(np.arange(self.walls.width), enemy_side_border_column)
 
 
-        self.estimated_positions_logger = logging.getLogger(f'estimated positions enemy {tracked_enemy_index})')
-        self.estimated_positions_logger.addHandler(DeferredFileHandler(f'estimated_positions_enemy_{tracked_enemy_index}'))
-        self.estimated_positions_logger.setLevel(logging.DEBUG)
+        if _LOGGING:
+            self.logger = logging.getLogger(f'EnemyPositionParticleFilter (enemy {tracked_enemy_index})')
+            self.logger.setLevel(logging.WARNING)
+            self.logger.addHandler(console_log_handler)
+            self.estimated_positions_logger = logging.getLogger(f'estimated positions enemy {tracked_enemy_index})')
+            self.estimated_positions_logger.addHandler(DeferredFileHandler(f'estimated_positions_enemy_{tracked_enemy_index}'))
+            self.estimated_positions_logger.setLevel(logging.DEBUG)
 
-        self.true_positions_logger = logging.getLogger(f'true positions enemy {tracked_enemy_index})')
-        self.true_positions_logger.addHandler(DeferredFileHandler(f'true_positions_enemy_{tracked_enemy_index}'))
-        self.true_positions_logger.setLevel(logging.DEBUG)
+            self.true_positions_logger = logging.getLogger(f'true positions enemy {tracked_enemy_index})')
+            self.true_positions_logger.addHandler(DeferredFileHandler(f'true_positions_enemy_{tracked_enemy_index}'))
+            self.true_positions_logger.setLevel(logging.DEBUG)
 
     
     def writeLogFiles(self):
-        for handler in [*self.estimated_positions_logger.handlers, *self.true_positions_logger.handlers]:
-            if type(handler) is DeferredFileHandler:
-                handler.flush()
+        if _LOGGING:
+            for handler in [*self.estimated_positions_logger.handlers, *self.true_positions_logger.handlers]:
+                if type(handler) is DeferredFileHandler:
+                    handler.flush()
 
     
     def move_particles(self):
@@ -88,13 +91,15 @@ class EnemyPositionParticleFilter:
         Move particles within the allowed range and considering the map's walls.
         Should be called exactly once after the enemy has actually moved. (e.g. agent 2 calls this in his turn to update enemy 1's position)
         """
-        self.logger.info(f'Moving particles')
+        if _LOGGING:
+            self.logger.info(f'Moving particles')
         current_particles_counter = Counter()
         for pos in self.particles:
             current_particles_counter[tuple(pos)] += 1
         
         sorted_particle_positions = sorted(current_particles_counter.items(), key=lambda x: x[1], reverse=True)
-        self.logger.info(f'Current top 10 particle positions: {dict(sorted_particle_positions[:10])}')
+        if _LOGGING:
+            self.logger.info(f'Current top 10 particle positions: {dict(sorted_particle_positions[:10])}')
 
         new_velocities = self.__generate_random_velocities(self.particles, self.velocities)
         np.copyto(self.velocities, new_velocities)
@@ -105,7 +110,8 @@ class EnemyPositionParticleFilter:
             new_particles_counter[tuple(pos)] += 1
 
         new_sorted_particle_positions = sorted(new_particles_counter.items(), key=lambda x: x[1], reverse=True)
-        self.logger.info(f'New particle positions: {dict(new_sorted_particle_positions[:10])}')
+        if _LOGGING:
+            self.logger.info(f'New particle positions: {dict(new_sorted_particle_positions[:10])}')
     
     
     def update_with_exact_position(self, position, is_pacman):

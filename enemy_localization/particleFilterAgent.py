@@ -21,8 +21,9 @@
 # For more info, see http://inst.eecs.berkeley.edu/~cs188/sp09/pacman.html
 
 from contest.captureAgents import CaptureAgent
-from particleFilter import EnemyPositionParticleFilter
+from enemy_localization.particleFilter import EnemyPositionParticleFilter
 from contest.util import manhattanDistance
+
 
 
 class ParticleFilterAgent(CaptureAgent):
