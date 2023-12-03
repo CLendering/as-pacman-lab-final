@@ -1,32 +1,4 @@
 //Testing Environment for MyTeam
-{
-    "version": "0.2.0",
-    "configurations": [
-
-        {
-            "name": "Python: Current File",
-            "type": "python",
-            "request": "launch",
-            "program": "pacman-contest\\src\\contest\\capture.py",
-            "args": [
-                "-r",
-                "myTeam.py",
-                "-b",
-                "pacman-contest\\src\\contest\\baselineTeam.py",
-                "--layout",
-                "pacman-contest\\src\\contest\\layouts\\defaultCapture"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"
-            },
-            "python": "C:\\Users\\camil\\anaconda3\\envs\\pacman\\python.exe"
-        },
-    ]
-}
-
-// GRID SEARCH
 // {
 //     "version": "0.2.0",
 //     "configurations": [
@@ -35,14 +7,14 @@
 //             "name": "Python: Current File",
 //             "type": "python",
 //             "request": "launch",
-//             "program": "pacman-contest\\src\\contest\\optimizer.py",
+//             "program": "pacman-contest\\src\\contest\\capture.py",
 //             "args": [
 //                 "-r",
 //                 "myTeam.py",
 //                 "-b",
-//                 "pacman-contest\\src\\contest\\baselineTeam.py",
+//                 "pacman-contest\\src\\contest\\customTeam.py",
 //                 "--layout",
-//                 "pacman-contest\\src\\contest\\layouts\\defaultCapture",
+//                 "pacman-contest\\src\\contest\\layouts\\defaultCapture"
 //             ],
 //             "console": "integratedTerminal",
 //             "justMyCode": false,
@@ -53,3 +25,31 @@
 //         },
 //     ]
 // }
+
+// GRID SEARCH
+{
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "pacman-contest\\src\\contest\\optimizer.py",
+            "args": [
+                "-r",
+                "myTeam.py",
+                "-b",
+                "pacman-contest\\src\\contest\\customTeam.py",
+                "--layout",
+                "pacman-contest\\src\\contest\\layouts\\defaultCapture",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"
+            },
+            "python": "C:\\Users\\berna\\anaconda3\\envs\\pacman-contest\\python.exe"
+        },
+    ]
+}
