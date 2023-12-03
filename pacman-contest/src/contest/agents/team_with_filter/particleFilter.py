@@ -96,9 +96,6 @@ class EnemyPositionParticleFilter:
         sorted_particle_positions = sorted(current_particles_counter.items(), key=lambda x: x[1], reverse=True)
         self.logger.info(f'Current top 10 particle positions: {dict(sorted_particle_positions[:10])}')
 
-
-
-
         new_velocities = self.__generate_random_velocities(self.particles, self.velocities)
         np.copyto(self.velocities, new_velocities)
         self.particles += new_velocities

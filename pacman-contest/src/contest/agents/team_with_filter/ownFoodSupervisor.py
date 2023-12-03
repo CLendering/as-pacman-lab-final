@@ -3,6 +3,9 @@ import numpy as np
 
 
 class OwnFoodSupervisor():
+    """
+    Keeps track of the food and capsules that are eaten by our enemies to localize them.
+    """
     def __init__(self):
         self.initialized = False
         self.logger = logging.getLogger('OwnFoodSupervisor)')
@@ -28,18 +31,17 @@ class OwnFoodSupervisor():
         own_food = np.array(own_food.data)
         own_capsules = set(own_capsules)
 
-        # Some of our food was eaten! (Do nothing if enemy was killed and dropped food on our side)
+        # Some of our food was eaten! (But do nothing if enemy was killed and dropped food on our side)
         if np.any(self.lastOwnFood.sum() > own_food.sum()):
             # x and y indices of food that is gone now 
             # (both np.arrays of length 1 because only one of our own pellets can go missing each time it's our turn) 
             x, y = (self.lastOwnFood != own_food).nonzero()
-            assert len(x) == len(y) == 1, "WTF?" # TODO remove
             self._localized_enemy_position = (x[0], y[0])
             self._localized_enemy_index = (agent_index - 1) % self.totalAgents
         elif self.lastOwnCapsules != own_capsules:
-            self._localized_enemy_position = self.lastOwnCapsules.difference(own_capsules)
+            self._localized_enemy_position = list(self.lastOwnCapsules.difference(own_capsules))[0]
             self._localized_enemy_index = (agent_index - 1) % self.totalAgents
-            self.lastOwnCapsules = self.lastOwnCapsules.intersection(own_capsules)
+            self.lastOwnCapsules = own_capsules
     
         # Update own food
         np.copyto(self.lastOwnFood, own_food)

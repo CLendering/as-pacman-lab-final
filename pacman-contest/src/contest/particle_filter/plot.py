@@ -3,6 +3,9 @@ import re
 import matplotlib.pyplot as plt
 import pandas as pd
 
+dirname = '02'
+
+
 # Function to extract numbers from a string
 def extract_numbers(s):
     return [int(num) for num in re.findall(r'\d+', s)]
@@ -138,8 +141,6 @@ def print_mean_manhattan_distance_error(dirname):
     for enemy in sorted(enemies):
         mean_manhattan_distance_error = (data['true_positions'][enemy] - data['estimated_positions'][enemy]).abs().sum(axis=1).mean()
         print(f'Mean Manhattan Distance Error for Enemy {enemy}: {mean_manhattan_distance_error:.2f}')
-
-dirname = 'baseline'
 
 
 print_mean_manhattan_distance_error(dirname)

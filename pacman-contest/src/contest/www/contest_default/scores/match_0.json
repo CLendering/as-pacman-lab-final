@@ -3,33 +3,33 @@
         [
             "Red",
             "Blue",
-            "tinyCapture.lay",
-            0,
-            null,
-            57.0,
+            "layouts\\defaultCapture.lay",
+            18,
+            "Blue",
+            158.0,
             0
         ]
     ],
     "layouts": [
-        "tinyCapture.lay"
+        "layouts\\defaultCapture.lay"
     ],
     "max_steps": 1200,
     "teams_stats": {
         "Blue": [
-            33.333333333333336,
+            100.0,
+            3,
             1,
             0,
-            1,
             0,
             0,
-            0
+            18
         ],
         "Red": [
-            33.333333333333336,
-            1,
+            0.0,
+            0,
+            0,
             0,
             1,
-            0,
             0,
             0
         ]

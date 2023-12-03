@@ -739,7 +739,7 @@ class Game:
             
             if PRINT_ACTIONS_AND_POSITIONS:
                 print(f'{agent_to_color[agent_index]} did action {action} and is now at {position}')
-            
+            print(self.state.data.timeleft)
             # Change the display
             self.display.update(self.state.data)
 

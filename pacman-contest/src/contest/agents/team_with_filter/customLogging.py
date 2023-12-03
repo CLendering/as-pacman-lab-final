@@ -17,7 +17,7 @@ class DeferredFileHandler(logging.Handler):
         super().__init__()
         self.setFormatter(formatter)
         self.setLevel(logging.DEBUG)
-        self.filepath = os.path.join(_logDir, name)
+        self.filepath = os.path.join(_logDir, name + '.log')
         self.buffer = []
 
     def emit(self, record):
