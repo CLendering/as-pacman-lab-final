@@ -4,7 +4,7 @@
     "configurations": [
 
         {
-            "name": "Python: Current File",
+            "name": "Pacman",
             "type": "python",
             "request": "launch",
             "program": "pacman-contest\\src\\contest\\capture.py",
@@ -14,15 +14,13 @@
                 "-b",
                 "pacman-contest\\src\\contest\\baselineTeam.py",
                 "--layout",
-                "pacman-contest\\src\\contest\\layouts\\defaultCapture"
+                "pacman-contest\\src\\contest\\layouts\\defaultCapture",
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}\\pacman-contest\\src"
-            },
-            "python": "C:\\Users\\camil\\anaconda3\\envs\\pacman\\python.exe"
-        },
+            }        },
     ]
 }
 
