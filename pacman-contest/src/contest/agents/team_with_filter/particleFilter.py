@@ -97,51 +97,12 @@ class EnemyPositionParticleFilter:
         self.logger.info(f'Current top 10 particle positions: {dict(sorted_particle_positions[:10])}')
 
 
-        SPEED = 1.0 # TODO change if enemy is scared -> just one bool per enemy should be enough. needs to be reset if scared ghost is eaten. also, use normal speed when scared but on the pacman side for each particle.
-        TURN_OR_MOVEMENT_START_PROBABILITY = 0.3 # TODO tune these values (or maybe even learn them). or analyze from historical game recordings.
-        REVERSE_PROBABILITY = 0.1
-        STOP_PROBABILITY = 0.05
 
-        action_counter = Counter()
 
-        for particle_index, ((x, y), v) in enumerate(zip(self.particles, self.velocities)):
-            config = Configuration((x, y), Actions.vector_to_direction(v)) # or use 'STOP'?
-            possible_actions = Actions.get_possible_actions(config, self.walls)
-            # Action is chosen randomly, but not uniformly:
-            # - continuing moving in the same direction is most probable
-            # - turning is less probable
-            # - reversing direction is even less probable
-            # - stop action is least probable
-
-            # Calculate probabilities for each action
-            action_probabilities = np.zeros(len(possible_actions))
-            for action_index, action in enumerate(possible_actions):
-                prev_velocity = self.velocities[action_index]
-                new_velocity  = np.array(Actions.direction_to_vector(action, SPEED)) # TODO: use scared ghost speed when applicable (particle in enemy half & enemy has scared timer)
-
-                if np.array_equal(new_velocity, (0, 0)):
-                    action_probabilities[action_index] = STOP_PROBABILITY
-                elif _is_reverse(new_velocity, prev_velocity):
-                    action_probabilities[action_index] = REVERSE_PROBABILITY
-                elif _is_turn_or_movement_start(new_velocity, prev_velocity):
-                    action_probabilities[action_index] = TURN_OR_MOVEMENT_START_PROBABILITY
-                else:
-                    action_probabilities[action_index] = 1 - TURN_OR_MOVEMENT_START_PROBABILITY - REVERSE_PROBABILITY - STOP_PROBABILITY
-
-            # Normalize probabilities
-            action_probabilities /= action_probabilities.sum()
-            
-            # Choose action based on probabilities
-            action = np.random.choice(possible_actions, p=action_probabilities)
-            dx, dy = Actions.direction_to_vector(action, SPEED) # TODO: use scared ghost speed when applicable (particle in enemy half & enemy has scared timer)
-
-            action_counter[action] +=1
-            
-            # Update particle position and velocity
-            self.particles[particle_index] = x + dx, y + dy
-            self.velocities[particle_index] = [dx, dy]
+        new_velocities = self.__generate_random_velocities(self.particles, self.velocities)
+        np.copyto(self.velocities, new_velocities)
+        self.particles += new_velocities
         
-        self.logger.info(f'Selected actions: {action_counter}')
         new_particles_counter = Counter()
         for pos in self.particles:
             new_particles_counter[tuple(pos)] += 1
@@ -160,6 +121,7 @@ class EnemyPositionParticleFilter:
         """
         self.particles[:] = position
         self.weights[:] = 1/self.num_particles
+        np.copyto(self.velocities, self.__generate_random_velocities(self.particles))
 
         position_distribution = np.zeros((self.walls.width, self.walls.height))
         position_distribution[position] = 1
@@ -339,14 +301,6 @@ class EnemyPositionParticleFilter:
                 # Only columns of our side are possible
                 distribution[self.enemy_side_columns, :] = 0
             
-
-
-            # TODO I think bug is:
-            # enemy agent on our side -> was_pacman true, exact position in all distributions
-            # enemy agent commits suicide -> we don't notice & don't reset his position
-            # 
-
-
             # normalize 
             if distribution.sum() > 0:
                 distribution /= distribution.sum()
@@ -355,7 +309,7 @@ class EnemyPositionParticleFilter:
                 print(f'oh no, distribution for enemy {self.tracked_enemy_index} is completely zero')# TODO remove
                 print(f'{self.was_pacman=} {is_pacman=}')
                 print(f'{old_distribution=}')
-                pass
+                raise "WTF"
 
         # Update the was_pacman state for the next iteration
         self.was_pacman = is_pacman
@@ -402,15 +356,51 @@ class EnemyPositionParticleFilter:
         flat_distribution = condensed_position_distribution.flatten()
         random_indices = np.random.choice(np.arange(len(flat_distribution)), size=num_random_particles, p=flat_distribution)
         self.particles[num_resampled_particles:] = np.array(np.unravel_index(random_indices, condensed_position_distribution.shape)).T
-        self.velocities[num_resampled_particles:] = self.__generate_random_velocities(num_random_particles)
+        self.velocities[num_resampled_particles:] = self.__generate_random_velocities(self.particles[num_resampled_particles:])
         self.weights[num_resampled_particles:] = flat_distribution[random_indices]
 
-    def __generate_random_velocities(self, num_random_particles):
-        # TODO implement
-        # For the generation of the velocities of random particles, the velocity should be calculated such that:
-        # - the velocity is legal (use Actions.get_possible_actions(Configuration(position, Directions.STOP), walls) to check this)
-        # - most velocities should point towards the current most probable position in condensed_position_distribution
-        return np.full((num_random_particles, 2), (0,0), dtype=float)
+    def __generate_random_velocities(self, current_positions, current_velocities=None):
+        SPEED = 1.0 # TODO change if enemy is scared -> just one bool per enemy should be enough. needs to be reset if scared ghost is eaten. also, use normal speed when scared but on the pacman side for each particle.
+        TURN_OR_MOVEMENT_START_PROBABILITY = 0.3 # TODO tune these values (or maybe even learn them). or analyze from historical game recordings.
+        REVERSE_PROBABILITY = 0.1
+        STOP_PROBABILITY = 0.05
+
+        velocities = np.zeros((len(current_positions), 2))
+
+        for i, current_position in enumerate(current_positions):
+            current_direction = Actions.vector_to_direction(current_velocities[i]) if current_velocities is not None else Directions.STOP 
+            config = Configuration(current_position, current_direction)
+            possible_actions = Actions.get_possible_actions(config, self.walls)
+            # Action is chosen randomly, but not uniformly:
+            # - stop action is least probable
+            # - reversing direction is more probable
+            # - turning or starting moving is even more probable
+            # - continuing moving in the same direction is most probable
+
+            # Calculate probabilities for each action
+            action_probabilities = np.zeros(len(possible_actions))
+            for action_index, action in enumerate(possible_actions):
+                prev_velocity = self.velocities[action_index]
+                new_velocity  = np.array(Actions.direction_to_vector(action, SPEED)) # TODO: use scared ghost speed when applicable (particle in enemy half & enemy has scared timer)
+
+                if np.array_equal(new_velocity, (0, 0)):
+                    action_probabilities[action_index] = STOP_PROBABILITY
+                elif _is_reverse(new_velocity, prev_velocity):
+                    action_probabilities[action_index] = REVERSE_PROBABILITY
+                elif _is_turn_or_movement_start(new_velocity, prev_velocity):
+                    action_probabilities[action_index] = TURN_OR_MOVEMENT_START_PROBABILITY
+                else:
+                    action_probabilities[action_index] = 1 - TURN_OR_MOVEMENT_START_PROBABILITY - REVERSE_PROBABILITY - STOP_PROBABILITY
+
+            # Normalize probabilities
+            action_probabilities /= action_probabilities.sum()
+            
+            # Choose action based on probabilities
+            action = np.random.choice(possible_actions, p=action_probabilities)
+            dx, dy = Actions.direction_to_vector(action, SPEED) # TODO: use scared ghost speed when applicable (particle in enemy half & enemy has scared timer)
+            velocities[i] = [dx, dy]
+
+        return velocities
 
 
     def __is_valid(self, position):
