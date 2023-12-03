@@ -1,0 +1,50 @@
+{
+    "games": [
+        [
+            "Red",
+            "Blue",
+            "pacman-contest\\src\\contest\\layouts\\defaultCapture.lay",
+            20,
+            "Red",
+            34.0,
+            0
+        ]
+    ],
+    "grid_search": {
+        "EPSILON": 0.4,
+        "GHOST_COLLISION_DISTANCE_ATTENUATION": 0.3,
+        "GHOST_COLLISION_PENALTY": 0.5,
+        "OPPONENT_GHOST_WEIGHT": 0.5,
+        "OPPONENT_GHOST_WEIGHT_ATTENUATION": 0.3,
+        "OPPONENT_PACMAN_WEIGHT": 0.5,
+        "OPPONENT_PACMAN_WEIGHT_ATTENUATION": 0.3,
+        "POWER_PELLET_WEIGHT": 0.5,
+        "POWER_PELLET_WEIGHT_ATTENUATION": 0.3,
+        "SCARED_GHOST_DISTANCE_ATTENUATION": 0.3,
+        "SCARED_GHOST_REWARD": 0.5
+    },
+    "layouts": [
+        "pacman-contest\\src\\contest\\layouts\\defaultCapture.lay"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "Blue": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ],
+        "Red": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            20
+        ]
+    }
+}

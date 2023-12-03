@@ -4,7 +4,7 @@
 # educational purposes provided that (1) you do not distribute or publish
 # solutions, (2) you retain this notice, and (3) you provide clear
 # attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
-# 
+#
 # Attribution Information: The Pacman AI projects were developed at UC Berkeley.
 # The core projects and autograders were primarily created by John DeNero
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
@@ -62,9 +62,10 @@ from contest.game import Actions
 from contest.game import GameStateData, Game, Grid, Configuration
 from contest.util import nearestPoint, manhattanDistance
 
-#DIR_SCRIPT = sys.path[0] + "/src/contest/"
+# DIR_SCRIPT = sys.path[0] + "/src/contest/"
 import contest
-DIR_SCRIPT = '/'.join(contest.__file__.split('/')[:-1])
+
+DIR_SCRIPT = "/".join(contest.__file__.split("/")[:-1])
 
 # If you change these, you won't affect the server, so you can't cheat
 KILL_POINTS = 0
@@ -87,18 +88,19 @@ def compute_noisy_distance(pos1, pos2):
 # YOUR INTERFACE TO THE PACMAN WORLD: A GameState #
 ###################################################
 
+
 class GameState:
     """
-  A GameState specifies the full game state, including the food, capsules,
-  agent configurations and score changes.
+    A GameState specifies the full game state, including the food, capsules,
+    agent configurations and score changes.
 
-  GameStates are used by the Game object to capture the actual state of the game and
-  can be used by agents to reason about the game.
+    GameStates are used by the Game object to capture the actual state of the game and
+    can be used by agents to reason about the game.
 
-  Much of the information in a GameState is stored in a GameStateData object.  We
-  strongly suggest that you access that data via the accessor methods below rather
-  than referring to the GameStateData object directly.
-  """
+    Much of the information in a GameState is stored in a GameStateData object.  We
+    strongly suggest that you access that data via the accessor methods below rather
+    than referring to the GameStateData object directly.
+    """
 
     ####################################################
     # Accessor methods: use these to access state data #
@@ -199,7 +201,7 @@ class GameState:
 
     def get_agent_distances(self):
         """Returns a noisy distance to each agent."""
-        if 'agent_distances' in dir(self):
+        if "agent_distances" in dir(self):
             return self.agent_distances
         else:
             return None
@@ -256,17 +258,10 @@ class GameState:
         # Adds the sonar signal
         pos = state.get_agent_position(index)
         n = state.get_num_agents()
-        distances = [compute_noisy_distance(pos, state.get_agent_position(i)) for i in range(n)]
+        distances = [
+            compute_noisy_distance(pos, state.get_agent_position(i)) for i in range(n)
+        ]
         state.agent_distances = distances
-
-        # TODO delete this - it's just for evaluating the kalman filter.
-        red = state.is_on_red_team(index)
-        enemies = state.get_blue_team_indices() if red else state.get_red_team_indices()
-        DEBUG_actual_enemy_positions = [state.get_agent_position(enemy) for enemy in enemies]
-        DEBUG_actual_enemy_distances = [manhattanDistance(pos, enemy_pos) for enemy_pos in DEBUG_actual_enemy_positions]
-        state.DEBUG_actual_enemy_positions = DEBUG_actual_enemy_positions
-        state.DEBUG_actual_enemy_distances = DEBUG_actual_enemy_distances
-        ######
 
         # Remove states of distant opponents
         if index in self.blue_team:
@@ -280,14 +275,19 @@ class GameState:
             seen = False
             enemy_pos = state.get_agent_position(enemy)
             for teammate in team:
-                if manhattanDistance(enemy_pos, state.get_agent_position(teammate)) <= SIGHT_RANGE:
+                if (
+                    manhattanDistance(enemy_pos, state.get_agent_position(teammate))
+                    <= SIGHT_RANGE
+                ):
                     seen = True
-            if not seen: state.data.agent_states[enemy].configuration = None
+            if not seen:
+                state.data.agent_states[enemy].configuration = None
         return state
 
     def __eq__(self, other):
         """Allows two states to be compared."""
-        if other is None: return False
+        if other is None:
+            return False
         return self.data == other.data
 
     def __hash__(self):
@@ -327,7 +327,8 @@ def make_half_grid(grid, red):
 
     for y in range(grid.height):
         for x in xrange:
-            if grid[x][y]: half_grid[x][y] = True
+            if grid[x][y]:
+                half_grid[x][y] = True
 
     return half_grid
 
@@ -354,9 +355,9 @@ COLLISION_TOLERANCE = 0.7  # How close ghosts must be to Pacman to kill
 
 class CaptureRules:
     """
-  These game rules manage the control flow of a game, deciding when
-  and how the game starts and ends.
-  """
+    These game rules manage the control flow of a game, deciding when
+    and how the game starts and ends.
+    """
 
     def __init__(self, quiet=False):
         self._init_blue_food = None
@@ -367,13 +368,19 @@ class CaptureRules:
         init_state = GameState()
         init_state.initialize(layout, len(agents))
         starter = random.randint(0, 1)
-        print('%s team starts' % ['Red', 'Blue'][starter])
-        game = Game(agents, display, self, starting_index=starter, mute_agents=mute_agents,
-                    catch_exceptions=catch_exceptions)
+        print("%s team starts" % ["Red", "Blue"][starter])
+        game = Game(
+            agents,
+            display,
+            self,
+            starting_index=starter,
+            mute_agents=mute_agents,
+            catch_exceptions=catch_exceptions,
+        )
         game.state = init_state
         game.length = length
         game.state.data.timeleft = length
-        if 'drawCenterLine' in dir(display):
+        if "drawCenterLine" in dir(display):
             display.drawCenterLine()
         self._init_blue_food = init_state.get_blue_food().count()
         self._init_red_food = init_state.get_red_food().count()
@@ -382,7 +389,7 @@ class CaptureRules:
     @staticmethod
     def process(state, game):
         """Checks to see whether it is time to end the game."""
-        if 'move_history' in dir(game):
+        if "move_history" in dir(game):
             if len(game.move_history) == game.length:
                 state.data._win = True
 
@@ -400,17 +407,26 @@ class CaptureRules:
                         blue_count += agent_state.num_returned
 
                 if blue_count >= food_to_win:  # state.getRedFood().count() == MIN_FOOD:
-                    print(f'The Blue team has returned at least {food_to_win} of the opponents\' dots.')
-                elif red_count >= food_to_win:  # state.getBlueFood().count() == MIN_FOOD:
-                    print(f'The Red team has returned at least {food_to_win} of the opponents\' dots.')
+                    print(
+                        f"The Blue team has returned at least {food_to_win} of the opponents' dots."
+                    )
+                elif (
+                    red_count >= food_to_win
+                ):  # state.getBlueFood().count() == MIN_FOOD:
+                    print(
+                        f"The Red team has returned at least {food_to_win} of the opponents' dots."
+                    )
                 else:  # if state.getBlueFood().count() > MIN_FOOD and state.getRedFood().count() > MIN_FOOD:
-                    print('Time is up.')
+                    print("Time is up.")
                     if state.data.score == 0:
-                        print('Tie game!')
+                        print("Tie game!")
                     else:
-                        winner = 'Red'
-                        if state.data.score < 0: winner = 'Blue'
-                        print(f'The {winner} team wins by {abs(state.data.score)} points.')
+                        winner = "Red"
+                        if state.data.score < 0:
+                            winner = "Blue"
+                        print(
+                            f"The {winner} team wins by {abs(state.data.score)} points."
+                        )
 
     def get_progress(self, game):
         blue = 1.0 - (game.state.get_blue_food().count() / float(self._init_blue_food))
@@ -491,11 +507,18 @@ class AgentRules:
         if current_position == nearest:
             is_red = state.is_on_red_team(agent_index)
             # Change agent type
-            agent_state.is_pacman = [is_red, state.is_red(agent_state.configuration)].count(True) == 1
+            agent_state.is_pacman = [
+                is_red,
+                state.is_red(agent_state.configuration),
+            ].count(True) == 1
             # if he's no longer pacman, he's on his own side, so reset the num carrying timer
             # agent_state.numCarrying *= int(agent_state.is_pacman)
             if agent_state.num_carrying > 0 and not agent_state.is_pacman:
-                score = agent_state.num_carrying if is_red else -1 * agent_state.num_carrying
+                score = (
+                    agent_state.num_carrying
+                    if is_red
+                    else -1 * agent_state.num_carrying
+                )
                 state.data.score_change += score
 
                 agent_state.num_returned += agent_state.num_carrying
@@ -509,10 +532,16 @@ class AgentRules:
                         red_count += agent.num_returned
                     else:
                         blue_count += agent.num_returned
-                if red_count >= (TOTAL_FOOD / 2) - MIN_FOOD or blue_count >= (TOTAL_FOOD / 2) - MIN_FOOD:
+                if (
+                    red_count >= (TOTAL_FOOD / 2) - MIN_FOOD
+                    or blue_count >= (TOTAL_FOOD / 2) - MIN_FOOD
+                ):
                     state.data._win = True
 
-        if agent_state.is_pacman and manhattanDistance(nearest, current_position) <= 0.9:
+        if (
+            agent_state.is_pacman
+            and manhattanDistance(nearest, current_position) <= 0.9
+        ):
             AgentRules.consume(nearest, state, state.is_on_red_team(agent_index))
 
     @staticmethod
@@ -520,7 +549,6 @@ class AgentRules:
         x, y = position
         # Eat food
         if state.data.food[x][y]:
-
             # blue case is the default
             team_indices_func = state.get_blue_team_indices
             # score = -1
@@ -530,7 +558,10 @@ class AgentRules:
                 team_indices_func = state.get_red_team_indices
 
             # go increase the variable for the pacman who ate this
-            agents = [state.data.agent_states[agentIndex] for agentIndex in team_indices_func()]
+            agents = [
+                state.data.agent_states[agentIndex]
+                for agentIndex in team_indices_func()
+            ]
             for agent in agents:
                 if agent.get_position() == position:
                     agent.num_carrying += 1
@@ -576,7 +607,7 @@ class AgentRules:
             return
 
         if not agent_state.is_pacman:
-            raise Exception('something is seriously wrong, this agent isn\'t a pacman!')
+            raise Exception("something is seriously wrong, this agent isn't a pacman!")
 
         # ok so agentState is this:
         if agent_state.num_carrying == 0:
@@ -585,7 +616,7 @@ class AgentRules:
         # first, score changes!
         # we HACK pack that ugly bug by just determining if its red based on the first position
         # to die...
-        dummy_config = Configuration(agent_state.get_position(), 'North')
+        dummy_config = Configuration(agent_state.get_position(), "North")
         is_red = state.is_red(dummy_config)
 
         # the score increases if red eats dots, so if we are refunding points,
@@ -596,7 +627,7 @@ class AgentRules:
         # state.data.scoreChange += scoreDirection * agentState.numCarrying
 
         def on_right_side(from_state, from_x, from_y):
-            new_dummy_config = Configuration((from_x, from_y), 'North')
+            new_dummy_config = Configuration((from_x, from_y), "North")
             return from_state.is_red(new_dummy_config) == is_red
 
         # we have food to dump
@@ -627,7 +658,10 @@ class AgentRules:
                 return False
 
             # loop through agents
-            agent_poses = [from_state.get_agent_position(i) for i in range(from_state.get_num_agents())]
+            agent_poses = [
+                from_state.get_agent_position(i)
+                for i in range(from_state.get_num_agents())
+            ]
             if (from_x, from_y) in agent_poses:
                 return False
 
@@ -647,7 +681,7 @@ class AgentRules:
         seen = set()
         while num_to_dump > 0:
             if not len(position_queue):
-                raise Exception('Exhausted BFS! uh oh')
+                raise Exception("Exhausted BFS! uh oh")
             # pop one off, graph check
             popped = position_queue.pop(0)
             if popped in seen:
@@ -683,10 +717,15 @@ class AgentRules:
         if agent_state.is_pacman:
             for index in other_team:
                 other_agent_state = state.data.agent_states[index]
-                if other_agent_state.is_pacman: continue
+                if other_agent_state.is_pacman:
+                    continue
                 ghost_position = other_agent_state.get_position()
-                if ghost_position is None: continue
-                if manhattanDistance(ghost_position, agent_state.get_position()) <= COLLISION_TOLERANCE:
+                if ghost_position is None:
+                    continue
+                if (
+                    manhattanDistance(ghost_position, agent_state.get_position())
+                    <= COLLISION_TOLERANCE
+                ):
                     # award points to the other team for killing Pacmen
                     if other_agent_state.scared_timer <= 0:
                         AgentRules.dump_food_from_death(state, agent_state)
@@ -709,10 +748,15 @@ class AgentRules:
         else:  # Agent is a ghost
             for index in other_team:
                 other_agent_state = state.data.agent_states[index]
-                if not other_agent_state.is_pacman: continue
+                if not other_agent_state.is_pacman:
+                    continue
                 pac_pos = other_agent_state.get_position()
-                if pac_pos is None: continue
-                if manhattanDistance(pac_pos, agent_state.get_position()) <= COLLISION_TOLERANCE:
+                if pac_pos is None:
+                    continue
+                if (
+                    manhattanDistance(pac_pos, agent_state.get_position())
+                    <= COLLISION_TOLERANCE
+                ):
                     # award points to the other team for killing Pacmen
                     if agent_state.scared_timer <= 0:
                         AgentRules.dump_food_from_death(state, other_agent_state)
@@ -744,16 +788,17 @@ class AgentRules:
 
 
 def default(input_str):
-    return input_str + ' [Default: %default]'
+    return input_str + " [Default: %default]"
 
 
 def parse_agent_args(input_str):
-    if input_str is None or input_str == '': return {}
-    pieces = input_str.split(',')
+    if input_str is None or input_str == "":
+        return {}
+    pieces = input_str.split(",")
     opts = {}
     for p in pieces:
-        if '=' in p:
-            key, val = p.split('=')
+        if "=" in p:
+            key, val = p.split("=")
         else:
             key, val = p, 1
         opts[key] = val
@@ -763,75 +808,208 @@ def parse_agent_args(input_str):
 def read_command(argv):
     """Processes the command used to run pacman from the command line."""
     from optparse import OptionParser
+
     usage_str = """
     USAGE:      python pacman.py <options>
     EXAMPLES:   (1) python capture.py
                     - starts a game with two baseline agents
                 (2) python capture.py --keys0
-                    - starts a two-player interactive game where the arrow keys cont<rol agent 0, and all other agents 
+                    - starts a two-player interactive game where the arrow keys control agent 0, and all other agents 
                     are baseline agents
                 (3) python capture.py -r baselineTeam -b myTeam
                     - starts a fully automated game where the red team is a baseline team and blue team is myTeam
     """
     parser = OptionParser(usage_str)
 
-    parser.add_option('-r', '--red', help=default('Red team'), default=os.path.join(DIR_SCRIPT, 'baselineTeam')),
-    parser.add_option('-b', '--blue', help=default('Blue team'), default=os.path.join(DIR_SCRIPT, 'baselineTeam')),
-    parser.add_option('--red-name', dest="red_name", help=default('Red team name'), default='Red')
-    parser.add_option('--blue-name', dest="blue_name", help=default('Blue team name'), default='Blue')
-    parser.add_option('--redOpts', dest="red_opts", help=default('Options for red team (e.g. first=keys)'), default='')
-    parser.add_option('--blueOpts', dest="blue_opts", help=default('Options for blue team (e.g. first=keys)'),
-                      default='')
-    parser.add_option('--keys0', help='Make agent 0 (first red player) a keyboard agent', action='store_true',
-                      default=False)
-    parser.add_option('--keys1', help='Make agent 1 (second red player) a keyboard agent', action='store_true',
-                      default=False)
-    parser.add_option('--keys2', help='Make agent 2 (first blue player) a keyboard agent', action='store_true',
-                      default=False)
-    parser.add_option('--keys3', help='Make agent 3 (second blue player) a keyboard agent', action='store_true',
-                      default=False)
-    parser.add_option('-l', '--layout', dest='layout',
-                      help=default('the LAYOUT_FILE from which to load the map layout; use RANDOM for a random maze; '
-                                   'use RANDOM<seed> to use a specified random seed, e.g., RANDOM23'),
-                      metavar='LAYOUT_FILE', default=os.path.join(DIR_SCRIPT, 'layouts', 'defaultCapture'))
-    parser.add_option('-t', '--textgraphics', action='store_true', dest='textgraphics',
-                      help='Display output as text only', default=False)
+    parser.add_option(
+        "-r",
+        "--red",
+        help=default("Red team"),
+        default=os.path.join(DIR_SCRIPT, "baselineTeam"),
+    ),
+    parser.add_option(
+        "-b",
+        "--blue",
+        help=default("Blue team"),
+        default=os.path.join(DIR_SCRIPT, "baselineTeam"),
+    ),
+    parser.add_option(
+        "--red-name", dest="red_name", help=default("Red team name"), default="Red"
+    )
+    parser.add_option(
+        "--blue-name", dest="blue_name", help=default("Blue team name"), default="Blue"
+    )
+    parser.add_option(
+        "--redOpts",
+        dest="red_opts",
+        help=default("Options for red team (e.g. first=keys)"),
+        default="",
+    )
+    parser.add_option(
+        "--blueOpts",
+        dest="blue_opts",
+        help=default("Options for blue team (e.g. first=keys)"),
+        default="",
+    )
+    parser.add_option(
+        "--keys0",
+        help="Make agent 0 (first red player) a keyboard agent",
+        action="store_true",
+        default=False,
+    )
+    parser.add_option(
+        "--keys1",
+        help="Make agent 1 (second red player) a keyboard agent",
+        action="store_true",
+        default=False,
+    )
+    parser.add_option(
+        "--keys2",
+        help="Make agent 2 (first blue player) a keyboard agent",
+        action="store_true",
+        default=False,
+    )
+    parser.add_option(
+        "--keys3",
+        help="Make agent 3 (second blue player) a keyboard agent",
+        action="store_true",
+        default=False,
+    )
+    parser.add_option(
+        "-l",
+        "--layout",
+        dest="layout",
+        help=default(
+            "the LAYOUT_FILE from which to load the map layout; use RANDOM for a random maze; "
+            "use RANDOM<seed> to use a specified random seed, e.g., RANDOM23"
+        ),
+        metavar="LAYOUT_FILE",
+        default=os.path.join(DIR_SCRIPT, "layouts", "defaultCapture"),
+    )
+    parser.add_option(
+        "-t",
+        "--textgraphics",
+        action="store_true",
+        dest="textgraphics",
+        help="Display output as text only",
+        default=False,
+    )
 
-    parser.add_option('-q', '--quiet', action='store_true',
-                      help='Display minimal output and no graphics', default=False)
+    parser.add_option(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Display minimal output and no graphics",
+        default=False,
+    )
 
-    parser.add_option('-Q', '--super-quiet', action='store_true', dest="super_quiet",
-                      help='Same as -q but agent output is also suppressed', default=False)
+    parser.add_option(
+        "-Q",
+        "--super-quiet",
+        action="store_true",
+        dest="super_quiet",
+        help="Same as -q but agent output is also suppressed",
+        default=False,
+    )
 
-    parser.add_option('-z', '--zoom', type='float', dest='zoom',
-                      help=default('Zoom in the graphics'), default=1)
-    parser.add_option('-i', '--time', type='int', dest='time',
-                      help=default('TIME limit of a game in moves'), default=1200, metavar='TIME')
-    parser.add_option('-n', '--numGames', type='int', dest="num_games", help=default('Number of games to play'),
-                      default=1)
-    parser.add_option('-f', '--fixRandomSeed', dest="fix_random_seed", action='store_true',
-                      help='Fixes the random seed to always play the same game', default=False)
-    parser.add_option('--setRandomSeed', dest="set_random_seed", type='str',
-                      help='Sets the random seed to a the given string')
-    parser.add_option('--record', action='store_true',
-                      help='Writes game histories to a file (named by the time they were played)', default=False)
+    parser.add_option(
+        "-z",
+        "--zoom",
+        type="float",
+        dest="zoom",
+        help=default("Zoom in the graphics"),
+        default=1,
+    )
+    parser.add_option(
+        "-i",
+        "--time",
+        type="int",
+        dest="time",
+        help=default("TIME limit of a game in moves"),
+        default=1200,
+        metavar="TIME",
+    )
+    parser.add_option(
+        "-n",
+        "--numGames",
+        type="int",
+        dest="num_games",
+        help=default("Number of games to play"),
+        default=1,
+    )
+    parser.add_option(
+        "-f",
+        "--fixRandomSeed",
+        dest="fix_random_seed",
+        action="store_true",
+        help="Fixes the random seed to always play the same game",
+        default=False,
+    )
+    parser.add_option(
+        "--setRandomSeed",
+        dest="set_random_seed",
+        type="str",
+        help="Sets the random seed to a the given string",
+    )
+    parser.add_option(
+        "--record",
+        action="store_true",
+        help="Writes game histories to a file (named by the time they were played)",
+        default=False,
+    )
 
-    parser.add_option('--record-log', dest="record_log", action='store_true',
-                      help='Writes game log  to a file (named by the time they were played)', default=False)
-    parser.add_option('--replay', default=None,
-                      help='Replays a recorded game file.')
-    parser.add_option('--replayq', default=None,
-                      help='Replays a recorded game file without display to generate result log.')
-    parser.add_option('--delay-step', type='float', dest='delay_step',
-                      help=default('Delay step in a play or replay.'), default=0.03)
-    parser.add_option('-x', '--numTraining', dest='num_training', type='int',
-                      help=default('How many episodes are training (suppresses output)'), default=0)
-    parser.add_option('-c', '--catch-exceptions', dest='catch_exceptions', action='store_true', default=False,
-                      help='Catch exceptions and enforce time limits')
-    parser.add_option('-m', '--match-id', dest='match_id', type='int', default=0,
-                      help='Set the gameplay identifier')
-    parser.add_option('-u', '--contest-name', dest='contest_name', type=str, default="default",
-                      help="Set the contest name")
+    parser.add_option(
+        "--record-log",
+        dest="record_log",
+        action="store_true",
+        help="Writes game log  to a file (named by the time they were played)",
+        default=False,
+    )
+    parser.add_option("--replay", default=None, help="Replays a recorded game file.")
+    parser.add_option(
+        "--replayq",
+        default=None,
+        help="Replays a recorded game file without display to generate result log.",
+    )
+    parser.add_option(
+        "--delay-step",
+        type="float",
+        dest="delay_step",
+        help=default("Delay step in a play or replay."),
+        default=0.03,
+    )
+    parser.add_option(
+        "-x",
+        "--numTraining",
+        dest="num_training",
+        type="int",
+        help=default("How many episodes are training (suppresses output)"),
+        default=0,
+    )
+    parser.add_option(
+        "-c",
+        "--catch-exceptions",
+        dest="catch_exceptions",
+        action="store_true",
+        default=False,
+        help="Catch exceptions and enforce time limits",
+    )
+    parser.add_option(
+        "-m",
+        "--match-id",
+        dest="match_id",
+        type="int",
+        default=0,
+        help="Set the gameplay identifier",
+    )
+    parser.add_option(
+        "-u",
+        "--contest-name",
+        dest="contest_name",
+        type=str,
+        default="default",
+        help="Set the contest name",
+    )
 
     parsed_options, other_junk = parser.parse_args(argv)
     assert len(other_junk) == 0, "Unrecognized options: " + str(other_junk)
@@ -843,131 +1021,156 @@ def read_command(argv):
     #    args['display'] = pygameDisplay.PacmanGraphics()
     if parsed_options.textgraphics:
         import contest.textDisplay as textDisplay
-        args['display'] = textDisplay.PacmanGraphics()
+
+        args["display"] = textDisplay.PacmanGraphics()
     elif parsed_options.quiet or parsed_options.replayq:
         import contest.textDisplay as textDisplay
-        args['display'] = textDisplay.NullGraphics()
+
+        args["display"] = textDisplay.NullGraphics()
     elif parsed_options.super_quiet:
         import contest.textDisplay as textDisplay
-        args['display'] = textDisplay.NullGraphics()
-        args['mute_agents'] = True
+
+        args["display"] = textDisplay.NullGraphics()
+        args["mute_agents"] = True
     else:
         import contest.captureGraphicsDisplay as captureGraphicsDisplay
+
         # Hack for agents writing to the display
         captureGraphicsDisplay.FRAME_TIME = 0
-        args['display'] = captureGraphicsDisplay.PacmanGraphics(parsed_options.red, parsed_options.red_name,
-                                                                parsed_options.blue,
-                                                                parsed_options.blue_name, parsed_options.zoom, 0,
-                                                                capture=True)
+        args["display"] = captureGraphicsDisplay.PacmanGraphics(
+            parsed_options.red,
+            parsed_options.red_name,
+            parsed_options.blue,
+            parsed_options.blue_name,
+            parsed_options.zoom,
+            0,
+            capture=True,
+        )
         import __main__
-        __main__.__dict__['_display'] = args['display']
 
-    args['red_team_name'] = parsed_options.red_name
-    args['blue_team_name'] = parsed_options.blue_name
+        __main__.__dict__["_display"] = args["display"]
+
+    args["red_team_name"] = parsed_options.red_name
+    args["blue_team_name"] = parsed_options.blue_name
 
     # Special case: recorded games don't use the runGames method or args structure
     if parsed_options.replay is not None:
-        print(f'Replaying recorded game {parsed_options.replay}.')
+        print(f"Replaying recorded game {parsed_options.replay}.")
         import pickle
-        recorded = pickle.load(open(parsed_options.replay, 'rb'), encoding="utf-8")
-        recorded['display'] = args['display']
-        recorded['delay'] = parsed_options.delay_step
-        recorded['red_team_name'] = parsed_options.red
-        recorded['blue_team_name'] = parsed_options.blue
-        recorded['wait_end'] = False
+
+        recorded = pickle.load(open(parsed_options.replay, "rb"), encoding="utf-8")
+        recorded["display"] = args["display"]
+        recorded["delay"] = parsed_options.delay_step
+        recorded["red_team_name"] = parsed_options.red
+        recorded["blue_team_name"] = parsed_options.blue
+        recorded["wait_end"] = False
         replay_game(**recorded)
         sys.exit(0)
 
     # Special case: recorded games don't use the runGames method or args structure
     if parsed_options.replayq is not None:
-        print(f'Replaying recorded game {parsed_options.replay}.')
+        print(f"Replaying recorded game {parsed_options.replay}.")
         import pickle
-        recorded = pickle.load(open(parsed_options.replayq, 'rb'), encoding="utf-8")
-        recorded['display'] = args['display']
-        recorded['delay'] = 0.0
-        recorded['red_team_name'] = parsed_options.red
-        recorded['blue_team_name'] = parsed_options.blue
-        recorded['wait_end'] = False
+
+        recorded = pickle.load(open(parsed_options.replayq, "rb"), encoding="utf-8")
+        recorded["display"] = args["display"]
+        recorded["delay"] = 0.0
+        recorded["red_team_name"] = parsed_options.red
+        recorded["blue_team_name"] = parsed_options.blue
+        recorded["wait_end"] = False
 
         replay_game(**recorded)
         sys.exit(0)
 
     if parsed_options.fix_random_seed:
-        random.seed('cs188')
+        random.seed("cs188")
 
     if parsed_options.set_random_seed:
         random.seed(parsed_options.set_random_seed)
 
     if parsed_options.record_log:
-        sub_folder = f'www/contest_{parsed_options.contest_name}/logs'
+        sub_folder = f"www/contest_{parsed_options.contest_name}/logs"
         os.makedirs(name=sub_folder, exist_ok=True)
-        sys.stdout = open(f'{sub_folder}/match_{parsed_options.match_id}.log', 'w')
+        sys.stdout = open(f"{sub_folder}/match_{parsed_options.match_id}.log", "w")
         sys.stderr = sys.stdout
 
     # Choose a pacman agent
-    red_args, blue_args = parse_agent_args(parsed_options.red_opts), parse_agent_args(parsed_options.blue_opts)
+    red_args, blue_args = parse_agent_args(parsed_options.red_opts), parse_agent_args(
+        parsed_options.blue_opts
+    )
     if parsed_options.num_training > 0:
-        red_args['num_training'] = parsed_options.num_training
-        blue_args['num_training'] = parsed_options.num_training
+        red_args["num_training"] = parsed_options.num_training
+        blue_args["num_training"] = parsed_options.num_training
     # no_keyboard = parsed_options.textgraphics or parsed_options.quiet or parsed_options.num_training > 0
-    print(f'\nRed team {parsed_options.red} with {red_args}:')
-    red_agents, redEnemyPositionParticleFilters = load_agents(True, parsed_options.red, red_args)
-    print(f'\nBlue team {parsed_options.blue} with {blue_args}:')
-    blue_agents, blueEnemyPositionParticleFilters = load_agents(False, parsed_options.blue, blue_args)
-    args['agents'] = sum([list(el) for el in zip(red_agents, blue_agents)], [])  # list of agents
+    print(f"\nRed team {parsed_options.red} with {red_args}:")
+    red_agents = load_agents(True, parsed_options.red, red_args)
+    print(f"\nBlue team {parsed_options.blue} with {blue_args}:")
+    blue_agents = load_agents(False, parsed_options.blue, blue_args)
+    args["agents"] = sum(
+        [list(el) for el in zip(red_agents, blue_agents)], []
+    )  # list of agents
 
-    args['display'].redEnemyPositionParticleFilters = redEnemyPositionParticleFilters
-    args['display'].blueEnemyPositionParticleFilters = blueEnemyPositionParticleFilters
-
-    print(f'{red_agents=} {blue_agents=}')
     if None in blue_agents or None in red_agents:
         if None in blue_agents:
-            print('\nBlue team failed to load!\n')
+            print("\nBlue team failed to load!\n")
         if None in red_agents:
-            print('\nRed team failed to load!\n')
-        raise Exception('No teams found!')
+            print("\nRed team failed to load!\n")
+        raise Exception("No teams found!")
 
     num_keyboard_agents = 0
     for index, val in enumerate(
-            [parsed_options.keys0, parsed_options.keys1, parsed_options.keys2, parsed_options.keys3]):
-        if not val: continue
+        [
+            parsed_options.keys0,
+            parsed_options.keys1,
+            parsed_options.keys2,
+            parsed_options.keys3,
+        ]
+    ):
+        if not val:
+            continue
         if num_keyboard_agents == 0:
             agent = keyboardAgents.KeyboardAgent(index)
         elif num_keyboard_agents == 1:
             agent = keyboardAgents.KeyboardAgent2(index)
         else:
-            raise Exception('Max of two keyboard agents supported')
+            raise Exception("Max of two keyboard agents supported")
         num_keyboard_agents += 1
-        args['agents'][index] = agent
+        args["agents"][index] = agent
 
     # Choose a layout
     import contest.layout as layout
+
     layouts = []
     for i in range(parsed_options.num_games):
-        if parsed_options.layout == 'RANDOM':
+        if parsed_options.layout == "RANDOM":
             layout_name, layout_text = random_layout()
-            layout_generated = layout.Layout(layout_name=layout_name, layout_text=layout_text.split('\n'))
-        elif parsed_options.layout.startswith('RANDOM'):
+            layout_generated = layout.Layout(
+                layout_name=layout_name, layout_text=layout_text.split("\n")
+            )
+        elif parsed_options.layout.startswith("RANDOM"):
             seed_chosen = int(parsed_options.layout[6:])
             layout_name, layout_text = random_layout(seed=seed_chosen)
-            layout_generated = layout.Layout(layout_name=layout_name, layout_text=layout_text.split('\n'))
-        elif parsed_options.layout.lower().find('capture') == -1:
-            raise Exception('You must use a capture layout with capture.py')
+            layout_generated = layout.Layout(
+                layout_name=layout_name, layout_text=layout_text.split("\n")
+            )
+        elif parsed_options.layout.lower().find("capture") == -1:
+            raise Exception("You must use a capture layout with capture.py")
         else:
             layout_generated = layout.get_layout(parsed_options.layout)
-        if layout_generated is None: raise Exception(f"The layout {parsed_options.layout} cannot be found")
+        if layout_generated is None:
+            raise Exception(f"The layout {parsed_options.layout} cannot be found")
 
         layouts.append(layout_generated)
 
-    args['layouts'] = layouts
-    args['length'] = parsed_options.time
-    args['num_games'] = parsed_options.num_games
-    args['num_training'] = parsed_options.num_training
-    args['record'] = parsed_options.record
-    args['catch_exceptions'] = parsed_options.catch_exceptions
-    args['delay_step'] = parsed_options.delay_step
-    args['match_id'] = parsed_options.match_id
-    args['contest_name'] = parsed_options.contest_name
+    args["layouts"] = layouts
+    args["length"] = parsed_options.time
+    args["num_games"] = parsed_options.num_games
+    args["num_training"] = parsed_options.num_training
+    args["record"] = parsed_options.record
+    args["catch_exceptions"] = parsed_options.catch_exceptions
+    args["delay_step"] = parsed_options.delay_step
+    args["match_id"] = parsed_options.match_id
+    args["contest_name"] = parsed_options.contest_name
     return args
 
 
@@ -977,7 +1180,8 @@ def random_layout(seed=None):
     # layout = 'layouts/random%08dCapture.lay' % seed
     # print 'Generating random layout in %s' % layout
     import contest.mazeGenerator as mazeGenerator
-    return f'RANDOM{seed}', mazeGenerator.generateMaze(seed)
+
+    return f"RANDOM{seed}", mazeGenerator.generateMaze(seed)
 
 
 def load_agents(is_red, agent_file, cmd_line_args):
@@ -1001,11 +1205,17 @@ def load_agents(is_red, agent_file, cmd_line_args):
         loader.exec_module(module)  # will be added to sys.modules dict
 
     except (NameError, ImportError):
-        print('Error: The team "' + agent_file + '" could not be loaded! ', file=sys.stderr)
+        print(
+            'Error: The team "' + agent_file + '" could not be loaded! ',
+            file=sys.stderr,
+        )
         traceback.print_exc()
         return [None] * 2
     except IOError:
-        print('Error: The team "' + agent_file + '" could not be loaded! ', file=sys.stderr)
+        print(
+            'Error: The team "' + agent_file + '" could not be loaded! ',
+            file=sys.stderr,
+        )
         traceback.print_exc()
         return [None] * 2
 
@@ -1017,16 +1227,13 @@ def load_agents(is_red, agent_file, cmd_line_args):
     # if textgraphics and factoryClassName.startswith('Keyboard'):
     #   raise Exception('Using the keyboard requires graphics (no text display, quiet or training games)')
 
-    enemyPositionParticleFilters = None
     try:
-        enemyPositionParticleFilters = getattr(module, 'enemyPositionParticleFilters')
+        create_team_func = getattr(module, "create_team")
     except AttributeError:
-        print(f"{'red' if is_red else 'blue'} team doesn't have enemyPositionParticleFilters")
-
-    try:
-        create_team_func = getattr(module, 'create_team')
-    except AttributeError:
-        print('Error: The team "' + agent_file + '" could not be loaded! ', file=sys.stderr)
+        print(
+            'Error: The team "' + agent_file + '" could not be loaded! ',
+            file=sys.stderr,
+        )
         traceback.print_exc()
         return [None] * 2
 
@@ -1034,10 +1241,20 @@ def load_agents(is_red, agent_file, cmd_line_args):
     if not is_red:
         index_addend = 1
     indices = [2 * i + index_addend for i in range(2)]
-    return create_team_func(indices[0], indices[1], is_red, **args), enemyPositionParticleFilters
+    return create_team_func(indices[0], indices[1], is_red, **args)
 
 
-def replay_game(layout, agents, actions, display, length, red_team_name, blue_team_name, wait_end=True, delay=1):
+def replay_game(
+    layout,
+    agents,
+    actions,
+    display,
+    length,
+    red_team_name,
+    blue_team_name,
+    wait_end=True,
+    delay=1,
+):
     rules = CaptureRules()
     game = rules.new_game(layout, agents, display, length, False, False)
     state = game.state
@@ -1067,17 +1284,22 @@ def replay_game(layout, agents, actions, display, length, red_team_name, blue_te
                 blue_count += agent_state.num_returned
 
         if blue_count >= food_to_win:  # state.getRedFood().count() == MIN_FOOD:
-            print(f'The Blue team has returned at least {food_to_win} of the opponents\' dots.')
+            print(
+                f"The Blue team has returned at least {food_to_win} of the opponents' dots."
+            )
         elif red_count >= food_to_win:  # state.getBlueFood().count() == MIN_FOOD:
-            print(f'The Red team has returned at least {food_to_win} of the opponents\' dots.')
+            print(
+                f"The Red team has returned at least {food_to_win} of the opponents' dots."
+            )
         else:  # if state.getBlueFood().count() > MIN_FOOD and state.getRedFood().count() > MIN_FOOD:
-            print('Time is up.')
+            print("Time is up.")
             if state.data.score == 0:
-                print('Tie game!')
+                print("Tie game!")
             else:
-                winner = 'Red'
-                if state.data.score < 0: winner = 'Blue'
-                print(f'The {winner} team wins by {abs(state.data.score)} points.')
+                winner = "Red"
+                if state.data.score < 0:
+                    winner = "Blue"
+                print(f"The {winner} team wins by {abs(state.data.score)} points.")
 
     if wait_end is True:
         print("END")
@@ -1089,13 +1311,27 @@ def replay_game(layout, agents, actions, display, length, red_team_name, blue_te
     display.finish()
 
 
-def run_games(layouts, agents, display, length, num_games, record, num_training, red_team_name, blue_team_name,
-              contest_name="default", mute_agents=False, catch_exceptions=False, delay_step=0, match_id=0):
+def run_games(
+    layouts,
+    agents,
+    display,
+    length,
+    num_games,
+    record,
+    num_training,
+    red_team_name,
+    blue_team_name,
+    contest_name="default",
+    mute_agents=False,
+    catch_exceptions=False,
+    delay_step=0,
+    match_id=0,
+):
     rules = CaptureRules()
     games_list = []
 
     if num_training > 0:
-        print(f'Playing {num_training} training games')
+        print(f"Playing {num_training} training games")
 
     for i in range(num_games):
         be_quiet = i < num_training
@@ -1103,38 +1339,56 @@ def run_games(layouts, agents, display, length, num_games, record, num_training,
         if be_quiet:
             # Suppress output and graphics
             import contest.textDisplay as textDisplay
+
             game_display = textDisplay.NullGraphics()
             rules.quiet = True
         else:
             game_display = display
             rules.quiet = False
-        g = rules.new_game(layout, agents, game_display, length, mute_agents, catch_exceptions)
+        g = rules.new_game(
+            layout, agents, game_display, length, mute_agents, catch_exceptions
+        )
         g.run(delay=delay_step)
-        if not be_quiet: games_list.append(g)
+        if not be_quiet:
+            games_list.append(g)
 
         g.record = None
         if record:
             import time
             import pickle
             import contest.game as game
-            components = {'layout': layout, 'agents': [game.Agent() for _ in agents], 'actions': g.move_history,
-                          'length': length, 'red_team_name': red_team_name, 'blue_team_name': blue_team_name}
+
+            components = {
+                "layout": layout,
+                "agents": [game.Agent() for _ in agents],
+                "actions": g.move_history,
+                "length": length,
+                "red_team_name": red_team_name,
+                "blue_team_name": blue_team_name,
+            }
             print("recorded")
             g.record = pickle.dumps(components)
-            sub_folder = f'www/contest_{contest_name}/replays'
+            sub_folder = f"www/contest_{contest_name}/replays"
             os.makedirs(name=sub_folder, exist_ok=True)
-            with open(f'{sub_folder}/match_{match_id}.replay', 'wb') as f:
+            with open(f"{sub_folder}/match_{match_id}.replay", "wb") as f:
                 f.write(g.record)
 
     if num_games > 1:
         scores = [game.state.data.score for game in games_list]
         red_win_rate = [s > 0 for s in scores].count(True) / float(len(scores))
         blue_win_rate = [s < 0 for s in scores].count(True) / float(len(scores))
-        print(f'Average Score:', sum(scores) / float(len(scores)))
-        print('Scores:       ', ', '.join([str(score) for score in scores]))
-        print(f'Red Win Rate:  {[s > 0 for s in scores].count(True)}/{len(scores)} ({red_win_rate:.2f})')
-        print(f'Blue Win Rate: {[s < 0 for s in scores].count(True)}/{len(scores)} ({blue_win_rate:.2f})')
-        print('Record:       ', ', '.join([('Blue', 'Tie', 'Red')[max(0, min(2, 1 + s))] for s in scores]))
+        print(f"Average Score:", sum(scores) / float(len(scores)))
+        print("Scores:       ", ", ".join([str(score) for score in scores]))
+        print(
+            f"Red Win Rate:  {[s > 0 for s in scores].count(True)}/{len(scores)} ({red_win_rate:.2f})"
+        )
+        print(
+            f"Blue Win Rate: {[s < 0 for s in scores].count(True)}/{len(scores)} ({blue_win_rate:.2f})"
+        )
+        print(
+            "Record:       ",
+            ", ".join([("Blue", "Tie", "Red")[max(0, min(2, 1 + s))] for s in scores]),
+        )
     return games_list
 
 
@@ -1150,7 +1404,9 @@ def get_games_data(games, red_name, blue_name, time_taken, match_id):
             winner, score = blue_name, -score
         else:
             winner, score = None, 0
-        games_data.append((red_name, blue_name, layout_name, score, winner, time_taken, match_id))
+        games_data.append(
+            (red_name, blue_name, layout_name, score, winner, time_taken, match_id)
+        )
     return games_data
 
 
@@ -1166,7 +1422,9 @@ def compute_team_stats(games_data, team_name):
             loses += 1
     points = (wins * 3) + draws
     return [
-        ((points * 100) / (3 * (wins + draws + loses))) if wins + draws + loses > 0 else 0,
+        ((points * 100) / (3 * (wins + draws + loses)))
+        if wins + draws + loses > 0
+        else 0,
         points,
         wins,
         draws,
@@ -1178,26 +1436,33 @@ def compute_team_stats(games_data, team_name):
 
 def save_score(games, total_time, *, contest_name, match_id, **kwargs):
     assert games
-    sub_folder = f'www/contest_{contest_name}/scores'
+    sub_folder = f"www/contest_{contest_name}/scores"
     os.makedirs(name=sub_folder, exist_ok=True)
-    games_data = get_games_data(games=games,
-                                red_name=kwargs['red_team_name'],
-                                blue_name=kwargs['blue_team_name'],
-                                time_taken=total_time,
-                                match_id=match_id)
+    games_data = get_games_data(
+        games=games,
+        red_name=kwargs["red_team_name"],
+        blue_name=kwargs["blue_team_name"],
+        time_taken=total_time,
+        match_id=match_id,
+    )
     teams_stats = {
-        kwargs['red_team_name']: compute_team_stats(games_data=games_data, team_name=kwargs['red_team_name']),
-        kwargs['blue_team_name']: compute_team_stats(games_data=games_data, team_name=kwargs['blue_team_name']),
+        kwargs["red_team_name"]: compute_team_stats(
+            games_data=games_data, team_name=kwargs["red_team_name"]
+        ),
+        kwargs["blue_team_name"]: compute_team_stats(
+            games_data=games_data, team_name=kwargs["blue_team_name"]
+        ),
     }
     match_data = {
-        'games': games_data,
-        'max_steps': games[0].length,
-        'teams_stats': teams_stats,
-        'layouts': [game.state.data.layout.layout_name for game in games],
+        "games": games_data,
+        "max_steps": games[0].length,
+        "teams_stats": teams_stats,
+        "layouts": [game.state.data.layout.layout_name for game in games],
     }
 
     import json
-    with open(f'{sub_folder}/match_{match_id}.json', 'w') as f:
+
+    with open(f"{sub_folder}/match_{match_id}.json", "w") as f:
         # print(games.state.data.score, file=f)
         f.write(json.dumps(match_data, sort_keys=True, indent=4))
 
@@ -1220,12 +1485,11 @@ def run(args):
     if games:
         # save_score(games=games, contest_name=options['contest_name'], match_id=options['match_id'])
         save_score(games=games, total_time=total_time, **options)
-    print(f'\nTotal Time Game: {total_time}', file=sys.stdout)
-
+    print(f"\nTotal Time Game: {total_time}", file=sys.stdout)
 
 def main():
     run(sys.argv[1:])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
