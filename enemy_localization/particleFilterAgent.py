@@ -24,6 +24,7 @@ from contest.captureAgents import CaptureAgent
 from enemy_localization.particleFilter import EnemyPositionParticleFilter
 from contest.util import manhattanDistance
 from collections import defaultdict
+from enemy_localization.customLogging import *
 import numpy as np
 
 
@@ -34,6 +35,26 @@ class ParticleFilterAgent(CaptureAgent):
         self.enemyPositionParticleFilters = enemyPositionParticleFilters
         self.ownFoodSupervisor = ownFoodSupervisor
         self.enemySuicideDetector = enemySuicideDetector
+
+
+        if EnemyPositionParticleFilter._LOGGING:        
+            self.estimated_distances_logger = logging.getLogger(f'estimated distances {self.index}')
+            self.estimated_distances_logger.addHandler(DeferredFileHandler(f'estimated_distances_agent_{self.index}'))
+            self.estimated_distances_logger.setLevel(logging.DEBUG)
+
+            self.true_distances_logger = logging.getLogger(f'true distances {self.index}')
+            self.true_distances_logger.addHandler(DeferredFileHandler(f'true_distances_{self.index}'))
+            self.true_distances_logger.setLevel(logging.DEBUG)
+
+            self.noisy_distances_logger = logging.getLogger(f'noisy distances {self.index}')
+            self.noisy_distances_logger.addHandler(DeferredFileHandler(f'noisy_distances_{self.index}'))
+            self.noisy_distances_logger.setLevel(logging.DEBUG)
+
+    def writeLogFiles(self):
+        if EnemyPositionParticleFilter._LOGGING:
+            for handler in [*self.estimated_distances_logger.handlers, *self.true_distances_logger.handlers, *self.noisy_distances_logger.handlers]:
+                if type(handler) is DeferredFileHandler:
+                    handler.flush()
 
     def register_initial_state(self, game_state):
         CaptureAgent.register_initial_state(self, game_state)
@@ -47,6 +68,7 @@ class ParticleFilterAgent(CaptureAgent):
             for enemy in self.enemies:
                 self.enemyPositionParticleFilters[enemy] = EnemyPositionParticleFilter(
                                                num_particles=500, 
+                                               noisy_position_distribution_buffer_length=10,
                                                walls=game_state.get_walls(), 
                                                initial_position=game_state.get_agent_position(enemy),
                                                tracked_enemy_index=enemy)
@@ -68,11 +90,9 @@ class ParticleFilterAgent(CaptureAgent):
         # suicide Detector must be updated before particle filter!
         self.enemySuicideDetector.update(game_state)
 
-        # Update the particle filter of the preceding enemy
-        # unless it's the very first move of the game (i.e. 1200 steps are left)
-        if game_state.data.timeleft != 1200:
-            # Determine the index of the enemy who just moved
-            enemy_who_just_moved = (self.index - 1) % self.totalAgents
+        # Update the particle filter of the preceding enemy (unless we got the very first move of the game)
+        enemy_who_just_moved = game_state.data._agent_moved
+        if enemy_who_just_moved is not None:
             # move particles of filter one time step into the future
             self.enemyPositionParticleFilters[enemy_who_just_moved].move_particles()
 
@@ -94,7 +114,28 @@ class ParticleFilterAgent(CaptureAgent):
                 pf.update_with_exact_position(self.ownFoodSupervisor.localizeEnemy(), is_pacman=True)
             # if enemy agent is not seen, update particle filter with noisy distance
             else:
-                pf.update_with_noisy_distance(self.own_position, noisy_distances[enemy_index], enemy_is_pacman)
+                pf.update_with_noisy_distance(self.own_position, noisy_distances[enemy_index], enemy_who_just_moved, enemy_is_pacman)
+
+
+
+        # LOGGING
+        if EnemyPositionParticleFilter._LOGGING:
+            estimated_pos = self.get_distinct_enemy_position_estimates()
+            DEBUG_actual_enemy_positions = game_state.DEBUG_actual_enemy_positions
+            self.estimated_distances_logger.info(self.get_distinct_enemy_distance_estimates())
+            self.true_distances_logger.info(game_state.DEBUG_actual_enemy_distances)
+            self.noisy_distances_logger.info([noisy_distances[enemy] for enemy in self.enemies])
+            for i, enemy in enumerate(self.enemies):
+                pf = self.enemyPositionParticleFilters[enemy]
+                pf.estimated_positions_logger.info(estimated_pos[i])
+                pf.true_positions_logger.info(DEBUG_actual_enemy_positions[i])
+            if game_state.data.timeleft < 4:
+                # last turn of agent: write own log files
+                self.writeLogFiles()
+                if game_state.data.timeleft < 2:
+                # last agent of team: flush particle filter logs
+                    for pf in self.enemyPositionParticleFilters.values():
+                        pf.writeLogFiles()
 
     def get_distinct_enemy_position_estimates(self):
         """

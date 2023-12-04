@@ -40,7 +40,7 @@
             ]
         },
         {
-            "name": "[quiet] Pacman Contest",
+            "name": "[quiet,fixseed] Pacman Contest",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
@@ -51,6 +51,7 @@
                 "-r",
                 "${workspaceFolder}/myTeam",
                 "-q",
+                "--fixRandomSeed",
                 "--delay-step",
                 "0"
             ]
@@ -91,6 +92,17 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
+        },
+        {
+            "name": "Plot",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/enemy_localization/logs/particle_filter/plot.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+            ]
         },
         {
             "name": "Keyboard Agents (doesn't work bc of some bug)",

@@ -2,22 +2,29 @@ import numpy as np
 from enemy_localization.customLogging import logging, console_log_handler, DeferredFileHandler
 from collections import deque
 from contest.capture import SONAR_NOISE_VALUES, SIGHT_RANGE
-from contest.pacman import GhostRules
 from contest.game import Directions, Configuration, Actions
-from contest.util import Counter
 
-_LOGGING = False
 
 _MAX_NOISE = max(SONAR_NOISE_VALUES)
 
 class EnemyPositionParticleFilter:
-    def __init__(self, num_particles, walls, initial_position, tracked_enemy_index):
-        # Unnormalized probability distribution based on noisy measurements, 
-        # clearing out positions within SIGHT_RANGE of the agent's position,
-        # and constraining the possible locations based on the transitions of the enemy's state (Pacman or Ghost)
-        # This is used to weigh the particles when resampling
-        self.noisy_position_distribution = np.zeros((walls.width, walls.height))
-        self.noisy_position_distribution[initial_position] = 1
+    _LOGGING = False
+    def __init__(self, num_particles, noisy_position_distribution_buffer_length, walls, initial_position, tracked_enemy_index):
+        # Possible directions
+        self.possible_directions = np.array([[-1, 0], [0, -1], [1, 0], [0, 1], [0, 0]])
+        # Mask which is False for all directions except the stop direction 
+        self.stop_direction_index = np.where(np.all(self.possible_directions==[0,0], axis=1))[0][0]
+        self.stop_direction_mask = np.full((1, 1, len(self.possible_directions)), False, dtype=bool)
+        self.stop_direction_mask[:, :, self.stop_direction_index] = True
+
+
+        # Distributions based on noisy measurements, not actual particle positions
+        # probability distributions of possible positions calculated from noisy distance estimates and agent position
+        # this is used as further input to update the belief (particles) of the particle filter when resampling
+        self.initial_position_distribution = np.zeros((walls.width, walls.height, len(self.possible_directions)))
+        self.initial_position_distribution[initial_position[0], initial_position[1], self.stop_direction_index] = 1
+        self.noisy_position_distributions = deque([np.copy(self.initial_position_distribution) for _ in range(noisy_position_distribution_buffer_length)], maxlen=noisy_position_distribution_buffer_length)
+
 
         # dtype needs to be float because scared ghosts move slower (0.5), normal speed is 1.0 
         self.particles = np.full((num_particles, 2), initial_position, dtype=float)
@@ -42,8 +49,6 @@ class EnemyPositionParticleFilter:
             self.manhattan_distance_grid[:, :, x, y] = np.nan
 
 
-        # Possible directions
-        self.possible_directions = np.array([[-1, 0], [0, -1], [1, 0], [0, 1], [0, 0]])
         # Constants for probabilities of how directions transition from one time step to the next
         TURN_OR_MOVEMENT_START_PROBABILITY = 0.3
         REVERSE_PROBABILITY = 0.1
@@ -105,21 +110,28 @@ class EnemyPositionParticleFilter:
         mid_point = self.walls.width // 2
         if self.spawn_position[0] < mid_point:
             # If the enemy's spawn position is in the left half, that's their side
-            self.enemy_side_columns = np.array(range(mid_point))
-            self.our_side_columns = np.array(range(mid_point, self.walls.width))
+            enemy_side_columns = np.array(range(mid_point))
+            our_side_columns = np.array(range(mid_point, self.walls.width))
             enemy_side_border_column = mid_point - 1
             our_side_border_column = mid_point
         else:
             # If the enemy's spawn position is in the right half, that's their side
-            self.enemy_side_columns = np.array(range(mid_point, self.walls.width))
-            self.our_side_columns = np.array(range(mid_point))
+            enemy_side_columns = np.array(range(mid_point, self.walls.width))
+            our_side_columns = np.array(range(mid_point))
             enemy_side_border_column = mid_point
             our_side_border_column = mid_point - 1
-        self.all_columns_except_border_of_our_team = np.setdiff1d(np.arange(self.walls.width), our_side_border_column)
-        self.all_columns_except_border_of_enemy_team = np.setdiff1d(np.arange(self.walls.width), enemy_side_border_column)
+        
+        # Boolean arrays where only the relevant positions are true
+        self.our_side_mask = np.full((walls.width, walls.height), False, dtype=bool)
+        self.our_side_mask[our_side_columns, :] = True
+        self.enemy_side_mask = np.full((walls.width, walls.height), False, dtype=bool)
+        self.enemy_side_mask[enemy_side_columns, :] = True
+        self.our_border_mask = np.full((walls.width, walls.height), False, dtype=bool)
+        self.our_border_mask[our_side_border_column, :] = True
+        self.enemy_border_mask = np.full((walls.width, walls.height), False, dtype=bool)
+        self.enemy_border_mask[enemy_side_border_column, :] = True
 
-
-        if _LOGGING:
+        if EnemyPositionParticleFilter._LOGGING:
             self.logger = logging.getLogger(f'EPPF (enemy {tracked_enemy_index})')
             self.logger.setLevel(logging.WARNING)
             self.logger.addHandler(console_log_handler)
@@ -133,7 +145,7 @@ class EnemyPositionParticleFilter:
 
     
     def writeLogFiles(self):
-        if _LOGGING:
+        if EnemyPositionParticleFilter._LOGGING:
             for handler in [*self.estimated_positions_logger.handlers, *self.true_positions_logger.handlers]:
                 if type(handler) is DeferredFileHandler:
                     handler.flush()
@@ -143,7 +155,7 @@ class EnemyPositionParticleFilter:
         Move particles within the allowed range and considering the map's walls.
         Should be called exactly once after the enemy has actually moved. (e.g. agent 2 calls this in his turn to update enemy 1's position)
         """  
-        new_directions = self.__generate_random_directions(self.particles, self.directions)
+        new_directions = self.__generate_next_directions(self.particles, self.directions)
         np.copyto(self.directions, new_directions)
         self.particles += new_directions # TODO multiply with speed depending on scared timer and is_pacman
         
@@ -158,8 +170,14 @@ class EnemyPositionParticleFilter:
         """
         self.particles[:] = position
         self.weights[:] = 1/self.num_particles
-        np.copyto(self.directions, self.__generate_random_directions(self.particles))
+        np.copyto(self.directions, self.__generate_next_directions(self.particles))
         self.was_pacman = is_pacman
+
+        exact_probability_distribution = np.zeros((self.walls.width, self.walls.height, len(self.possible_directions)))
+        exact_probability_distribution[position[0], position[1], self.stop_direction_index] = 1
+        # Reset noisy position distributions
+        for i in range(len(self.noisy_position_distributions)):
+            np.copyto(self.noisy_position_distributions[i], exact_probability_distribution)
 
     
     def reset_to_spawn(self):
@@ -170,7 +188,7 @@ class EnemyPositionParticleFilter:
         self.update_with_exact_position(self.spawn_position, is_pacman=False)
 
     
-    def update_with_noisy_distance(self, agent_position, noisy_distance, is_pacman):
+    def update_with_noisy_distance(self, agent_position, noisy_distance, enemy_who_just_moved, is_pacman):
         """
         Recalculates weights and resamples particles with the given noisy distance.
         Every agent should call this in every turn with all noisy estimates they get.
@@ -178,9 +196,10 @@ class EnemyPositionParticleFilter:
         If an agent gets an exact position estimate, 
         they should not call this method but update_with_exact_position instead.
         """
-        self.__update_noisy_position_distribution(agent_position, noisy_distance, is_pacman)
-        self.__weigh_particles()
-        self.__resample_particles()
+        self.__update_noisy_position_distributions(agent_position, noisy_distance, enemy_who_just_moved, is_pacman)
+        condensed_position_distribution = self.__get_condensed_position_distribution()
+        self.__weigh_particles(condensed_position_distribution)
+        self.__resample_particles(condensed_position_distribution)
 
     
     def estimate_distinct_position(self):
@@ -222,41 +241,107 @@ class EnemyPositionParticleFilter:
 
         return probability_distribution
 
-    def __update_noisy_position_distribution(self, agent_position, noisy_distance, is_pacman):
+    def __update_noisy_position_distributions(self, agent_position, noisy_distance, enemy_who_just_moved, is_pacman):
         """
         Update the noisy position distributions based on a new noisy distance measurement.
         """
-        # set new position distribution from new noisy_distance
-        self.__set_new_noisy_position_distribution(agent_position, noisy_distance)
+        # make old position distributions fade into adjacent cells
+        if enemy_who_just_moved == self.tracked_enemy_index:
+            self.__flatten_out_noisy_position_distributions()
+
+        # add new position distribution
+        self.__add_new_noisy_position_distribution(agent_position, noisy_distance, is_pacman)
 
         # reset probabilities of positions in SIGHT_RANGE to zero
-        self.__clear_noisy_probability_distribution_in_sight_range(agent_position)
+        self.__clear_noisy_probability_distributions_in_sight_range(agent_position)
 
         # use the information whether the enemy is a pacman or a ghost to further constrain the possible locations
-        self.__constrain_noisy_probability_distribution_based_on_pacman_state(is_pacman)
+        if enemy_who_just_moved == self.tracked_enemy_index:
+            self.__constrain_noisy_probability_distributions_based_on_pacman_state(is_pacman)
+
+        # normalize noisy position distributions (they may not sum to 1 due to the above steps - e.g. clearing positions in sight range is done in every update)
+        for distribution in self.noisy_position_distributions:
+            if distribution.sum() > 0:
+                distribution /= distribution.sum()
  
 
-    def __set_new_noisy_position_distribution(self, agent_position, noisy_distance):
-        # TODO check if it's better if we don't reset the distribution to zero but instead just increment the values
-        # but I don't think that would be better
-        self.noisy_position_distribution[:] = 0
+    def __flatten_out_noisy_position_distributions(self):
+        """
+        Flatten out the noisy position distributions to account for potential movement as time progresses.
+        """
+        # Iterate over all except first one in queue because it will be overwritten anyways when the new one is added
+        for i in range(1, len(self.noisy_position_distributions)):
+            distribution = self.noisy_position_distributions[i]
+            # Initialize new distribution
+            new_distribution = np.zeros_like(distribution)
+
+            # Flatten distribution for vectorized operations
+            distribution_flat = distribution.reshape(-1)
+            non_zero_entries = np.argwhere(distribution_flat > 0)
+
+            # Unravel indices to get x, y, and direction indices
+            x_coords, y_coords, direction_indices = np.unravel_index(non_zero_entries[:, 0], distribution.shape)
+
+            current_probs = distribution_flat[non_zero_entries[:, 0]]
+
+            for new_direction_index, new_direction in enumerate(self.possible_directions):
+                # Compute new positions to which the probabilities will move
+                # clip is used to prevent positions from going out of bounds when updating new_distribution
+                # this isn't a problem because self.direction_probabilities is accessed through position, old directions, new direction; not through clipped new_x/new_y
+                new_x = np.clip(x_coords + new_direction[0], 0, self.walls.width - 1)
+                new_y = np.clip(y_coords + new_direction[1], 0, self.walls.height - 1)
+
+                # Transition probabilities for the current direction to the new direction
+                transition_probs = self.direction_probabilities[x_coords, y_coords, direction_indices, new_direction_index]
+
+                # Calculate the probabilities to add
+                probs_to_add = current_probs * transition_probs
+
+                # Update the new distribution
+                np.add.at(new_distribution, (new_x, new_y, np.full(new_x.shape, new_direction_index)), probs_to_add)
+
+
+            # Update the old distribution
+            np.copyto(distribution, new_distribution)
+
+
+    def __add_new_noisy_position_distribution(self, agent_position, noisy_distance, is_pacman):
+        new_noisy_position_distribution = np.zeros_like(self.initial_position_distribution)
 
         # Calculate bounds for noise range
-        min_distance = noisy_distance - _MAX_NOISE
         max_distance = noisy_distance + _MAX_NOISE
+        min_distance = noisy_distance - _MAX_NOISE
 
         # Use the pre-calculated Manhattan distance grid 
         # (contains distances between all pairs of positions, np.nan for distances involving walls)
         distance_from_agent = self.manhattan_distance_grid[agent_position[0], agent_position[1], :, :]
         
         # Identify valid positions within noise range and not walls
-        valid_positions_mask = distance_from_agent <= max_distance
+        valid_positions_mask = (min_distance <= distance_from_agent) & (distance_from_agent <= max_distance)
+
+        # Further mask valid positions based on whether the enemy is a pacman or a ghost
+        if is_pacman:
+            valid_positions_mask &= self.our_side_mask
+        else:
+            valid_positions_mask &= self.enemy_side_mask
+
+
+        # Calculate mask so only probability cells with direction=stop are set
+        # (because we don't know which direction they are headed to. but they will start moving when __flatten_out_noisy_position_distributions updates the distributions in the next step)
+        final_mask = np.expand_dims(valid_positions_mask, axis=-1) & self.stop_direction_mask
 
         # Update noisy_position_distribution
-        self.noisy_position_distribution[valid_positions_mask] += 1
+        # Each possible position is equally probable
+        new_noisy_position_distribution[final_mask] += 1
+
+        # Normalize
+        new_noisy_position_distribution /= new_noisy_position_distribution.sum()
+
+        # Add new noisy position distribution to the buffer
+        self.noisy_position_distributions.append(new_noisy_position_distribution)
 
 
-    def __clear_noisy_probability_distribution_in_sight_range(self, agent_position):
+    def __clear_noisy_probability_distributions_in_sight_range(self, agent_position):
         """
         Update all probability distributions such that positions within SIGHT_RANGE of agent_position are set to zero.
         """
@@ -266,14 +351,16 @@ class EnemyPositionParticleFilter:
         # Positions within SIGHT_RANGE and not walls
         within_sight_range_mask = distances_from_agent_to_all_positions <= SIGHT_RANGE
                                    
-        # Set these positions to zero in noisy_position_distribution
-        self.noisy_position_distribution[within_sight_range_mask] = 0       
+        # Set these positions to zero in noisy_position_distributions
+        for distribution in self.noisy_position_distributions:
+            distribution[within_sight_range_mask] = 0       
 
 
 
-    def __constrain_noisy_probability_distribution_based_on_pacman_state(self, is_pacman):
+    def __constrain_noisy_probability_distributions_based_on_pacman_state(self, is_pacman):
         """
-        Constrain the possible locations of the enemy based on its state transition (Pacman or Ghost).
+        After the noisy probability distributions have been flattened out because the enemy moved,
+        further constrain the possible locations of the enemy based on its state transition (Pacman or Ghost).
         was_pacman     | new is_pacman      | possible locations
         --------------------------------------------------------
         False          | False              | on their side
@@ -281,42 +368,74 @@ class EnemyPositionParticleFilter:
         True           | False              | just entered their side (exactly at 1 column)
         True           | True               | on our side
         """
-        if self.was_pacman and not is_pacman:
-            # Enemy was Pacman and now is a ghost, should be just entering their side
-            # Only the border column of their side is possible
-            self.noisy_position_distribution[self.all_columns_except_border_of_enemy_team, :] = 0
-        elif not self.was_pacman and is_pacman:
-            # Enemy was a ghost and now is Pacman, should be just entering our side
-            # Only the border column of our side is possible
-            self.noisy_position_distribution[self.all_columns_except_border_of_our_team, :] = 0
-        elif not self.was_pacman and not is_pacman:
-            # Enemy was a ghost and is still a ghost, should be on their side
-            # Only columns of their side are possible
-            self.noisy_position_distribution[self.our_side_columns, :] = 0
-        elif self.was_pacman and is_pacman:
-            # Enemy was Pacman and is still Pacman, should be on our side
-            # Only columns of our side are possible
-            self.noisy_position_distribution[self.enemy_side_columns, :] = 0
-    
+        for distribution in self.noisy_position_distributions:
+            if self.was_pacman and not is_pacman:
+                # Enemy was Pacman and now is a ghost, should be just entering their side
+                # Only the border column of their side is possible
+                distribution[self.enemy_border_mask, :] = 0
+            elif not self.was_pacman and is_pacman:
+                # Enemy was a ghost and now is Pacman, should be just entering our side
+                # Only the border column of our side is possible
+                distribution[self.our_border_mask, :] = 0
+            elif not self.was_pacman and not is_pacman:
+                # Enemy was a ghost and is still a ghost, should be on their side
+                # Only columns of their side are possible
+                distribution[self.our_side_mask, :] = 0
+            elif self.was_pacman and is_pacman:
+                # Enemy was Pacman and is still Pacman, should be on our side
+                # Only columns of our side are possible
+                distribution[self.enemy_side_mask, :] = 0
+        
         # Update the was_pacman state for the next iteration
         self.was_pacman = is_pacman
+
+
+    def _DEBUG_print_noisy_position_distributions(self):
+        l = []
+        for i, d in enumerate(self.noisy_position_distributions):
+            nonzero = np.sum(d,axis=2).nonzero()
+            nonzero_pos = [(a, b) for a, b in zip(*nonzero)] if all(len(arr) > 0 for arr in nonzero) else []
+            print(f'{i}: {nonzero_pos}')
+            l.append(nonzero_pos)
+        return l
+    
+    def _DEBUG_print_noisy_position_distribution(self, distribution):
+            nonzero = np.sum(distribution,axis=2).nonzero()
+            nonzero_pos = [(a, b) for a, b in zip(*nonzero)] if all(len(arr) > 0 for arr in nonzero) else []
+            print(nonzero_pos)
+            return nonzero_pos
         
-    def __weigh_particles(self):
+
+    def __get_condensed_position_distribution(self):
         """
-        Weigh particles based on the noisy position distribution.
+        Returns a condensed version of all distributions in self.noisy_position_distributions.
+        This makes the noise cancel out and the distribution more accurate.
+        """
+        # Sum across all distributions and directions (the directions are just for flattening out the distributions across time) 
+        # This way the noise hopefully cancels out
+        condensed_distribution = np.sum(np.array(self.noisy_position_distributions), axis=0).sum(axis=2)
+
+        # normalize
+        condensed_distribution /= np.sum(self.noisy_position_distributions)
+        assert np.isclose(condensed_distribution.sum(), 1)
+        return condensed_distribution
+
+    def __weigh_particles(self, condensed_position_distribution):
+        """
+        Weigh particles based on the condensed position distribution.
         """
         int_particles = np.rint(self.particles).astype(int)
-        self.weights[:] = self.noisy_position_distribution[int_particles[:,0], int_particles[:,1]]
+        self.weights[:] = condensed_position_distribution[int_particles[:,0], int_particles[:,1]]
         if self.weights.sum() > 0:
             self.weights /= self.weights.sum()
         else:
             print('WTF?! This is bad and should not happen')
             self.weights[:] = 1/self.num_particles
 
-    def __resample_particles(self):
+    def __resample_particles(self, condensed_position_distribution):
         """
         Resample particles based on their weights.
-        Also adds random particles based on self.noisy_position_distribution.
+        Also adds random particles based on condensed_position_distribution.
         """
         N = self.num_particles
         # TODO tune random particles fraction
@@ -331,18 +450,15 @@ class EnemyPositionParticleFilter:
  
         # Add random particles from the current noisy position distribution to prevent particle deprivation
         # Find positions with non-zero probability
-        possible_positions = np.argwhere(self.noisy_position_distribution != 0)
+        possible_positions = np.argwhere(condensed_position_distribution != 0)
         # Randomly sample from possible positions
         random_particles = possible_positions[np.random.choice(possible_positions.shape[0], num_random_particles)]
         self.particles[num_resampled_particles:] = random_particles
-        self.directions[num_resampled_particles:] = self.__generate_random_directions(random_particles)
+        self.directions[num_resampled_particles:] = self.__generate_next_directions(random_particles)
 
 
-    def __generate_random_directions(self, current_positions, current_directions=None):
-        # Normalize and ensure positions are within bounds
+    def __generate_next_directions(self, current_positions, current_directions=None):
         current_positions = np.rint(current_positions).astype(int)
-        current_positions[:, 0] = np.clip(current_positions[:, 0], 0, self.walls.width - 1)
-        current_positions[:, 1] = np.clip(current_positions[:, 1], 0, self.walls.height - 1)
 
         # Handling the case when current_directions is None - use (0,0) direction
         if current_directions is None:
@@ -353,7 +469,7 @@ class EnemyPositionParticleFilter:
             # Convert directions to indices
             direction_indices = np.argmax(np.all(self.possible_directions[:, np.newaxis] == current_directions, axis=2), axis=0)
 
-        # Use advanced indexing to get the probabilities
+        # Get the relevant probabilities
         all_direction_probabilities = self.direction_probabilities[current_positions[:, 0], current_positions[:, 1], direction_indices]
 
         # Vectorized selection of new direction indices

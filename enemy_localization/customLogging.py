@@ -28,7 +28,8 @@ class DeferredFileHandler(logging.Handler):
         self.buffer = []
 
 
-def __createEmptyLogDir(baseDir):
+def __createEmptyLogDir(dirName):
+    baseDir = os.path.join(os.path.dirname(__file__), 'logs', dirName)
     if not os.path.exists(baseDir):
         os.makedirs(baseDir)
 

@@ -8,7 +8,7 @@ times = defaultdict(list)
 def timeit(func):
     @wraps(func)
     def timeit_wrapper(*args, **kwargs):
-        N = 1 if func.__name__ == '__init__' else 100
+        N = 1 if func.__name__ in ['__init__', 'register_initial_state'] else 100
         start_time = time.perf_counter()
         result = func(*args, **kwargs)
         end_time = time.perf_counter()
