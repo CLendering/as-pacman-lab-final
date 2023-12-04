@@ -12,28 +12,31 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
     ):
         super().__init__(index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing)
         ## HYPERPARAMETERS ##
-        self.OPPONENT_GHOST_WEIGHT = 5  # Cost for approaching an opponent ghost
-        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.5 # Attenuation factor for the cost based on distance to the opponent ghost
-        self.OPPONENT_PACMAN_WEIGHT = 7  # Reward for approaching an opponent pacman
-        self.OPPONENT_PACMAN_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the opponent pacman
-        self.POWER_PELLET_WEIGHT = 0.5  # Reward for approaching a power pellet
-        self.POWER_PELLET_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the power pellet
+        self.OPPONENT_GHOST_WEIGHT = 8  # Cost for approaching an opponent ghost
+        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.3 # Attenuation factor for the cost based on distance to the opponent ghost
+        self.OPPONENT_PACMAN_WEIGHT = 2  # Reward for approaching an opponent pacman
+        self.OPPONENT_PACMAN_WEIGHT_ATTENUATION = 0.3  # Attenuation factor for the reward based on distance to the opponent pacman
+        self.POWER_PELLET_WEIGHT = 8  # Reward for approaching a power pellet
+        self.POWER_PELLET_WEIGHT_ATTENUATION = 2  # Attenuation factor for the reward based on distance to the power pellet
         self.SCARED_GHOST_REWARD = 8  # Reward for approaching a scared ghost
-        self.SCARED_GHOST_DISTANCE_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the scared ghost
-        self.GHOST_COLLISION_PENALTY = 20  # Penalty for states closer to a previously known ghost location
-        self.GHOST_COLLISION_DISTANCE_ATTENUATION = 0.2  # Attenuation factor for the penalty based on distance to the previously known ghost location
-        self.EPSILON = 0.001  # Small value to avoid division by zero
+        self.SCARED_GHOST_DISTANCE_ATTENUATION = 1  # Attenuation factor for the reward based on distance to the scared ghost
+        self.GHOST_COLLISION_PENALTY = 10  # Penalty for states closer to a previously known ghost location
+        self.GHOST_COLLISION_DISTANCE_ATTENUATION = 2  # Attenuation factor for the penalty based on distance to the previously known ghost location
+        self.EPSILON = 0.2  # Small value to avoid division by zero
         self.goal = None
         self.plan = None
         self.action_planner = action_planner
         self.has_smart_defensive_offensive_capabilities = False
         self.defensive_roaming_goal = None
+        self.opponents_indexes = None
 
 
     def register_initial_state(self, game_state):
         super().register_initial_state(game_state)
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
         self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
+        self.opponents_indexes = self.get_opponents(game_state)
+
 
     # Implements A* and executes the plan
     def choose_action(self, game_state):
@@ -43,15 +46,17 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
         enemy_probabilistic_positions_estimates = self.get_probabilistic_enemy_position_estimates()
         enemy_probabilistic_distances_estimates = self.get_probabilistic_enemy_distance_estimates()
 
-        # TODO use enemy position/distance estimates, e.g. like this:
-        # for pos, prob in np.ndenumerate(enemy_probabilistic_positions_estimates[0]):
-        #     # Now pos is a tuple of the position (x,y) of the first enemy and prob is the probability of that position
-        #     pass
-        # for distance, prob in enemy_probabilistic_distances_estimates[0].items():
-        #    # Now distance is the distance to the first enemy and prob is the probability of that distance
-        #    pass
-        
+        # For the previous variables for the estimates, hold them in a dictionary with the enemy index as the key, knowing that the enemy index is not the same as those in the estimates, which follow the order of the opponents_indexes
+        enemy_position_estimates_dict = {self.opponents_indexes[i]: enemy_position_estimates[i] for i in range(len(self.opponents_indexes))}
+        enemy_distance_estimates_dict = {self.opponents_indexes[i]: enemy_distance_estimates[i] for i in range(len(self.opponents_indexes))}
+        enemy_probabilistic_positions_estimates_dict = {self.opponents_indexes[i]: enemy_probabilistic_positions_estimates[i] for i in range(len(self.opponents_indexes))}
+        enemy_probabilistic_distances_estimates_dict = {self.opponents_indexes[i]: enemy_probabilistic_distances_estimates[i] for i in range(len(self.opponents_indexes))}
 
+        self.enemy_position_estimates = enemy_position_estimates_dict
+        self.enemy_distance_estimates = enemy_distance_estimates_dict
+        self.enemy_probabilistic_positions_estimates = enemy_probabilistic_positions_estimates_dict
+        self.enemy_probabilistic_distances_estimates = enemy_probabilistic_distances_estimates_dict
+        
         # start_goal_calc = time.perf_counter()
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
         # print("Goal calc time: ", time.perf_counter() - start_goal_calc)
@@ -149,12 +154,22 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
 
         opponent_ghost_distances = {}
         opponent_pacman_distances = {}
-        for member in opponent_team_members:
-            distance = game_state.agent_distances[member]
-            if game_state.get_agent_state(member).is_pacman:
-                opponent_pacman_distances[member] = distance
-            else:
-                opponent_ghost_distances[member] = distance
+        # If estimates are available, use the non-probabilistic estimates
+        if self.enemy_position_estimates is not None and self.enemy_distance_estimates is not None:
+            for member in opponent_team_members:
+                distance = self.enemy_distance_estimates[member]
+                if self.enemy_position_estimates[member] is not None:
+                    if game_state.get_agent_state(member).is_pacman:
+                        opponent_pacman_distances[member] = distance
+                    else:
+                        opponent_ghost_distances[member] = distance
+        else:
+            for member in opponent_team_members:
+                distance = game_state.agent_distances[member]
+                if game_state.get_agent_state(member).is_pacman:
+                    opponent_pacman_distances[member] = distance
+                else:
+                    opponent_ghost_distances[member] = distance
 
         if profiling_dict is not None:
             profiling_dict['_categorize_opponents'] = time.perf_counter() - start_time

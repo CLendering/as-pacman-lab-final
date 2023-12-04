@@ -27,16 +27,23 @@ class GoalPlannerDefensive(GoalPlanner):
             int(game_state.data.layout.height / 2),
         )
 
-        # Enemy Pacman Positions
-        enemy_pacman_positions = {
-            opponent: game_state.get_agent_position(opponent)
-            for opponent in agent.get_opponents(game_state)
-            if game_state.get_agent_state(opponent).is_pacman
-        }
-        # Remove None values
-        enemy_pacman_positions = {
-            k: v for k, v in enemy_pacman_positions.items() if v is not None
-        }
+        # Enemy Pacman Positions: Use estimates for enemy pacman positions if the agent has them
+        if agent.enemy_position_estimates:
+            enemy_pacman_positions = {
+                opponent: agent.enemy_position_estimates[opponent]
+                for opponent in agent.get_opponents(game_state)
+                if game_state.get_agent_state(opponent).is_pacman
+            }
+        else:
+            enemy_pacman_positions = {
+                opponent: game_state.get_agent_position(opponent)
+                for opponent in agent.get_opponents(game_state)
+                if game_state.get_agent_state(opponent).is_pacman
+            }
+            # Remove None values
+            enemy_pacman_positions = {
+                k: v for k, v in enemy_pacman_positions.items() if v is not None
+            }
 
         # Distance to center
         x_distance_to_center = abs(agent_pos[0] - game_state.data.layout.width // 2)
@@ -76,7 +83,7 @@ class GoalPlannerDefensive(GoalPlanner):
             return evade_invader_goal
          
         # Closest Invader Targeting Goal: If the agent can see an invader and is a ghost, set the goal to chase the invader
-        closest_invader_targeting_goal = GoalPlannerDefensive._closest_invader_targeting_mode(agent, agent_is_pacman, enemy_pacman_positions, agent_pos)
+        closest_invader_targeting_goal = GoalPlannerDefensive._closest_invader_targeting_mode(agent, agent_is_pacman, enemy_pacman_positions, agent_pos, center_of_board)
         if closest_invader_targeting_goal:
             return closest_invader_targeting_goal
 
@@ -219,9 +226,9 @@ class GoalPlannerDefensive(GoalPlanner):
 
                 return bfs_until_non_wall(closest_safe_position, game_state)[-1]
             
-    # Closest Invader Targeting Goal: If the agent can see an invader and is a ghost, set the goal to chase the invader
+    # Closest Invader Targeting Goal: If the agent can see an invader (or has an estimate) and is a ghost, set the goal to chase the invader
     @staticmethod
-    def _closest_invader_targeting_mode(agent, agent_is_pacman, enemy_pacman_positions, agent_pos):
+    def _closest_invader_targeting_mode(agent, agent_is_pacman, enemy_pacman_positions, agent_pos, center_of_board):
         if agent_is_pacman == False and len(enemy_pacman_positions) > 0:
             closest_invader = min(
                 enemy_pacman_positions,
@@ -229,7 +236,24 @@ class GoalPlannerDefensive(GoalPlanner):
                     agent_pos, enemy_pacman_positions[opponent]
                 ),
             )
-            return enemy_pacman_positions[closest_invader]
+
+            closest_invader_pos = enemy_pacman_positions[closest_invader]
+
+            # If the closest invader position estimate is at the enemy side of the board, clamp the goal to be before the center of the board
+            if agent.red:
+                if closest_invader_pos[0] > center_of_board[0]:
+                    closest_invader_pos = (
+                        center_of_board[0] - 1,
+                        closest_invader_pos[1],
+                    )
+            else:
+                if closest_invader_pos[0] < center_of_board[0]:
+                    closest_invader_pos = (
+                        center_of_board[0] + 1,
+                        closest_invader_pos[1],
+                    )
+            
+            return closest_invader_pos
 
 
     # Recently Eaten Food Goal: If the agent is a ghost and can see recently eaten food, set the goal to go to the closest food pellet that has been eaten by the opponent team
