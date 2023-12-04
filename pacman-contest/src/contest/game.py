@@ -788,6 +788,8 @@ class Game:
             self.unmute()
 
             # Execute the action
+            if self.state.data.timeleft % 100 == 0:
+                print(f"Time left: {self.state.data.timeleft}")
             self.move_history.append((agent_index, action))
             if self.catch_exceptions:
                 try:
