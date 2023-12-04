@@ -76,8 +76,15 @@ class EnemyPositionParticleFilter:
                     else:
                         # Set probability to zero for impossible directions
                         self.direction_probabilities[x, y, prev_dir_index, new_dir_index] = 0
-        # Normalize probabilities
-        self.direction_probabilities /= np.sum(self.direction_probabilities, axis=-1, keepdims=True)
+        # Normalize probabilities where the sum is non-zero (ignoring wall positions where we would divide by 0)
+        for x in range(walls.width):
+            for y in range(walls.height):
+                for prev_dir_index in range(len(self.possible_directions)):
+                    sum_probabilities = np.sum(self.direction_probabilities[x, y, prev_dir_index])
+                    if sum_probabilities > 0:
+                        self.direction_probabilities[x, y, prev_dir_index] /= sum_probabilities
+
+
 
 
         # Initialize particle directions
@@ -300,7 +307,11 @@ class EnemyPositionParticleFilter:
         """
         int_particles = np.rint(self.particles).astype(int)
         self.weights[:] = self.noisy_position_distribution[int_particles[:,0], int_particles[:,1]]
-        self.weights /= self.weights.sum()
+        if self.weights.sum() > 0:
+            self.weights /= self.weights.sum()
+        else:
+            print('WTF?! This is bad and should not happen')
+            self.weights[:] = 1/self.num_particles
 
     def __resample_particles(self):
         """
