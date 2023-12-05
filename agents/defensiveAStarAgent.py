@@ -25,14 +25,14 @@ class DefensiveAStarAgent(ParticleFilterAgent):
         self.enemy_probabilistic_positions_estimates = None
 
         ## HYPERPARAMETERS ##
-        self.OPPONENT_GHOST_WEIGHT = 8  # Cost for approaching an opponent ghost
-        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.3 # Attenuation factor for the cost based on distance to the opponent ghost
-        self.OPPONENT_PACMAN_WEIGHT = 2  # Reward for approaching an opponent pacman
+        self.OPPONENT_GHOST_WEIGHT = 20  # Cost for approaching an opponent ghost
+        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.7 # Attenuation factor for the cost based on distance to the opponent ghost
+        self.OPPONENT_PACMAN_WEIGHT = 8  # Reward for approaching an opponent pacman
         self.OPPONENT_PACMAN_WEIGHT_ATTENUATION = 0.3  # Attenuation factor for the reward based on distance to the opponent pacman
-        self.ALLY_GHOST_WEIGHT = 5  # Cost for approaching an ally ghost
-        self.ALLY_GHOST_WEIGHT_ATTENUATION = 0.5 # Attenuation factor for the cost based on distance to the ally ghost
-        self.ALLY_PACMAN_WEIGHT = 7  # Cost for approaching an ally pacman
-        self.ALLY_PACMAN_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the cost based on distance to the ally pacman
+        self.ALLY_GHOST_WEIGHT = 8  # Cost for approaching an ally ghost
+        self.ALLY_GHOST_WEIGHT_ATTENUATION = 0.3 # Attenuation factor for the cost based on distance to the ally ghost
+        self.ALLY_PACMAN_WEIGHT = 4  # Cost for approaching an ally pacman
+        self.ALLY_PACMAN_WEIGHT_ATTENUATION = 2  # Attenuation factor for the cost based on distance to the ally pacman
 
     def register_initial_state(self, game_state):
         super().register_initial_state(game_state)

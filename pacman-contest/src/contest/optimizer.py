@@ -1109,27 +1109,24 @@ def read_command(argv, grid_search):
     # LOAD OPTIMIZER PARAMETERS FOR OFFENSIVE A* AGENT
     hyperparameters = grid_search
 
-    red_agents[0].OPPONENT_GHOST_WEIGHT = hyperparameters["OPPONENT_GHOST_WEIGHT"]
-    red_agents[0].OPPONENT_GHOST_WEIGHT_ATTENUATION = hyperparameters[
+    red_agents[1].OPPONENT_GHOST_WEIGHT = hyperparameters["OPPONENT_GHOST_WEIGHT"]
+    red_agents[1].OPPONENT_GHOST_WEIGHT_ATTENUATION = hyperparameters[
         "OPPONENT_GHOST_WEIGHT_ATTENUATION"
     ]
-    red_agents[0].OPPONENT_PACMAN_WEIGHT = hyperparameters["OPPONENT_PACMAN_WEIGHT"]
-    red_agents[0].OPPONENT_PACMAN_WEIGHT_ATTENUATION = hyperparameters[
+    red_agents[1].OPPONENT_PACMAN_WEIGHT = hyperparameters["OPPONENT_PACMAN_WEIGHT"]
+    red_agents[1].OPPONENT_PACMAN_WEIGHT_ATTENUATION = hyperparameters[
         "OPPONENT_PACMAN_WEIGHT_ATTENUATION"
     ]
-    red_agents[0].POWER_PELLET_WEIGHT = hyperparameters["POWER_PELLET_WEIGHT"]
-    red_agents[0].POWER_PELLET_WEIGHT_ATTENUATION = hyperparameters[
-        "POWER_PELLET_WEIGHT_ATTENUATION"
+    red_agents[1].ALLY_GHOST_WEIGHT = hyperparameters["ALLY_GHOST_WEIGHT"]
+    red_agents[1].ALLY_GHOST_WEIGHT_ATTENUATION = hyperparameters[
+        "ALLY_GHOST_WEIGHT_ATTENUATION"
     ]
-    red_agents[0].SCARED_GHOST_REWARD = hyperparameters["SCARED_GHOST_REWARD"]
-    red_agents[0].SCARED_GHOST_DISTANCE_ATTENUATION = hyperparameters[
-        "SCARED_GHOST_DISTANCE_ATTENUATION"
+    red_agents[1].ALLY_PACMAN_WEIGHT = hyperparameters["ALLY_PACMAN_WEIGHT"]
+    red_agents[1].ALLY_PACMAN_WEIGHT_ATTENUATION = hyperparameters[
+        "ALLY_PACMAN_WEIGHT_ATTENUATION"
     ]
-    red_agents[0].GHOST_COLLISION_PENALTY = hyperparameters["GHOST_COLLISION_PENALTY"]
-    red_agents[0].GHOST_COLLISION_DISTANCE_ATTENUATION = hyperparameters[
-        "GHOST_COLLISION_DISTANCE_ATTENUATION"
-    ]
-    red_agents[0].EPSILON = hyperparameters["EPSILON"]
+
+    red_agents[1].EPSILON = hyperparameters["EPSILON"]
 
 
     print(f"\nBlue team {parsed_options.blue} with {blue_args}:")
@@ -1516,104 +1513,77 @@ def run(args):
         save_score(games=games, total_time=total_time, **options)
     print(f"\nTotal Time Game: {total_time}", file=sys.stdout)
 
+
 # Custom optimizer for agent parameters
 def run_optimizer(args):
     # Grid Search for Offensive A* Agent
-    ## PENALTY FOR STATES WITH GHOSTS NEARBY
-    OPPONENT_GHOST_WEIGHT = [0.5, 1, 2, 4, 8, 12]
+    OPPONENT_GHOST_WEIGHT = [0.5, 1, 2, 4, 8, 20]
     OPPONENT_GHOST_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    OPPONENT_PACMAN_WEIGHT = [0.5, 1, 2, 4, 8, 12]
+    OPPONENT_PACMAN_WEIGHT = [0.5, 1, 2, 4, 8, 20]
     OPPONENT_PACMAN_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    POWER_PELLET_WEIGHT = [0.5, 1, 2, 4, 8, 12]
-    POWER_PELLET_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    SCARED_GHOST_REWARD = [0.5, 1, 2, 4, 8, 12]
-    SCARED_GHOST_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    GHOST_COLLISION_PENALTY = [0.5, 1, 2, 4, 8, 12]
-    GHOST_COLLISION_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    EPSILON = [0.001]
+    ALLY_GHOST_WEIGHT = [0.5, 1, 2, 4, 8, 20]
+    ALLY_GHOST_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+    ALLY_PACMAN_WEIGHT = [0.5, 1, 2, 4, 8, 20]
+    ALLY_PACMAN_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+
+    EPSILON = [0.2]
 
     grid_search = {
         "OPPONENT_GHOST_WEIGHT": 0,
         "OPPONENT_GHOST_WEIGHT_ATTENUATION": 0,
         "OPPONENT_PACMAN_WEIGHT": 0,
         "OPPONENT_PACMAN_WEIGHT_ATTENUATION": 0,
-        "POWER_PELLET_WEIGHT": 0,
-        "POWER_PELLET_WEIGHT_ATTENUATION": 0,
-        "SCARED_GHOST_REWARD": 0,
-        "SCARED_GHOST_DISTANCE_ATTENUATION": 0,
-        "GHOST_COLLISION_PENALTY": 0,
-        "GHOST_COLLISION_DISTANCE_ATTENUATION": 0,
+        "ALLY_GHOST_WEIGHT": 0,
+        "ALLY_GHOST_WEIGHT_ATTENUATION": 0,
+        "ALLY_PACMAN_WEIGHT": 0,
+        "ALLY_PACMAN_WEIGHT_ATTENUATION": 0,
         "EPSILON": 0,
     }
 
     # Args for --super-quiet and num_games
-    args_append = ["--super-quiet", "--numGames", "10"]
+    args_append = ["--super-quiet", "--numGames", "15"]
     args.extend(args_append)
 
     # Dict to store grid search results
     grid_search_results = {}
 
+    # Number of iterations to run
+    num_iterations = 100
 
-    # Iterate over all combinations of parameters
-    for opponent_ghost_weight in OPPONENT_GHOST_WEIGHT:
-        for opponent_ghost_weight_attenuation in OPPONENT_GHOST_WEIGHT_ATTENUATION:
-            for opponent_pacman_weight in OPPONENT_PACMAN_WEIGHT:
-                for opponent_pacman_weight_attenuation in OPPONENT_PACMAN_WEIGHT_ATTENUATION:
-                    for power_pellet_weight in POWER_PELLET_WEIGHT:
-                        for power_pellet_weight_attenuation in POWER_PELLET_WEIGHT_ATTENUATION:
-                            for scared_ghost_reward in SCARED_GHOST_REWARD:
-                                for scared_ghost_distance_attenuation in SCARED_GHOST_DISTANCE_ATTENUATION:
-                                    for ghost_collision_penalty in GHOST_COLLISION_PENALTY:
-                                        for ghost_collision_distance_attenuation in GHOST_COLLISION_DISTANCE_ATTENUATION:
-                                            for epsilon in EPSILON:
-                                                # Set parameters
-                                                grid_search["OPPONENT_GHOST_WEIGHT"] = opponent_ghost_weight
-                                                grid_search["OPPONENT_GHOST_WEIGHT_ATTENUATION"] = opponent_ghost_weight_attenuation
-                                                grid_search["OPPONENT_PACMAN_WEIGHT"] = opponent_pacman_weight
-                                                grid_search["OPPONENT_PACMAN_WEIGHT_ATTENUATION"] = opponent_pacman_weight_attenuation
-                                                grid_search["POWER_PELLET_WEIGHT"] = power_pellet_weight
-                                                grid_search["POWER_PELLET_WEIGHT_ATTENUATION"] = power_pellet_weight_attenuation
-                                                grid_search["SCARED_GHOST_REWARD"] = scared_ghost_reward
-                                                grid_search["SCARED_GHOST_DISTANCE_ATTENUATION"] = scared_ghost_distance_attenuation
-                                                grid_search["GHOST_COLLISION_PENALTY"] = ghost_collision_penalty
-                                                grid_search["GHOST_COLLISION_DISTANCE_ATTENUATION"] = ghost_collision_distance_attenuation
-                                                grid_search["EPSILON"] = epsilon
+    # Randomly sample hyperparameters for each iteration
+    for _ in range(num_iterations):
+        grid_search["OPPONENT_GHOST_WEIGHT"] = random.choice(OPPONENT_GHOST_WEIGHT)
+        grid_search["OPPONENT_GHOST_WEIGHT_ATTENUATION"] = random.choice(OPPONENT_GHOST_WEIGHT_ATTENUATION)
+        grid_search["OPPONENT_PACMAN_WEIGHT"] = random.choice(OPPONENT_PACMAN_WEIGHT)
+        grid_search["OPPONENT_PACMAN_WEIGHT_ATTENUATION"] = random.choice(OPPONENT_PACMAN_WEIGHT_ATTENUATION)
+        grid_search["ALLY_GHOST_WEIGHT"] = random.choice(ALLY_GHOST_WEIGHT)
+        grid_search["ALLY_GHOST_WEIGHT_ATTENUATION"] = random.choice(ALLY_GHOST_WEIGHT_ATTENUATION)
+        grid_search["ALLY_PACMAN_WEIGHT"] = random.choice(ALLY_PACMAN_WEIGHT)
+        grid_search["ALLY_PACMAN_WEIGHT_ATTENUATION"] = random.choice(ALLY_PACMAN_WEIGHT_ATTENUATION)
+        grid_search["EPSILON"] = random.choice(EPSILON)
 
-                                                # Run game
-                                                start_time = time.time()
+        # Run game
+        start_time = time.time()
+        
+        options = read_command(args, grid_search=grid_search)  # Get game components based on input
+        print(options, file=sys.stdout)
 
-                                        
-                                                
-                                                options = read_command(args, grid_search=grid_search)  # Get game components based on input
-                                                print(options, file=sys.stdout)
+        games = run_games(**options)
+        total_time = round(time.time() - start_time, 0)
 
-                                                games = run_games(**options)
-                                                total_time = round(time.time() - start_time, 0)
+        options["contest_name"] = "grid_search"
 
-                                                options["contest_name"] = "grid_search"
+        if games:
+            games_data = get_games_data(
+                games=games,
+                red_name=options["red_team_name"],
+                blue_name=options["blue_team_name"],
+                time_taken=total_time,
+                match_id=options["match_id"],
+            )
 
-                                                if games:
-                                                    games_data = get_games_data(
-                                                        games=games,
-                                                        red_name=options["red_team_name"],
-                                                        blue_name=options["blue_team_name"],
-                                                        time_taken=total_time,
-                                                        match_id=options["match_id"],
-                                                    )
-
-                                                    games_data_only_winner_and_score = []
-                                                    for game in games_data:
-                                                        games_data_only_winner_and_score.append((game[4], game[3]))
-
-                                                        
-
-                                                    # Store results
-                                                    grid_search_results[str(grid_search)] = games_data_only_winner_and_score
-
-
-                                                print(f"\nTotal Time Game: {total_time}", file=sys.stdout)
-                                                # Print the parameters used for this game
-                                                print(f"\nFinished Parameters: {grid_search}", file=sys.stdout)
+            # Store results
+            grid_search_results[str(grid_search)] = games_data
 
 
     # Print best parameters based on win rate but untie with average score
@@ -1621,12 +1591,12 @@ def run_optimizer(args):
     for params in grid_search_results:
         win_rate = 0
         for game in grid_search_results[params]:
-            if game[0] == "Red":
+            if game[4] == "Red":
                 win_rate += 1
         win_rate /= len(grid_search_results[params])
         avg_score = 0
         for game in grid_search_results[params]:
-            avg_score += game[1]
+            avg_score += game[3]
         avg_score /= len(grid_search_results[params])
         params_array.append((params, win_rate, avg_score))
 

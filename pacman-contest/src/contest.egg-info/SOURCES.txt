@@ -5,6 +5,7 @@ src/contest/baselineTeam.py
 src/contest/capture.py
 src/contest/captureAgents.py
 src/contest/captureGraphicsDisplay.py
+src/contest/customTeam.py
 src/contest/distanceCalculator.py
 src/contest/game.py
 src/contest/generateTournamentLayouts.py
@@ -14,6 +15,7 @@ src/contest/graphicsUtils.py
 src/contest/keyboardAgents.py
 src/contest/layout.py
 src/contest/mazeGenerator.py
+src/contest/optimizer.py
 src/contest/pacman.py
 src/contest/pacmanAgents.py
 src/contest/replay.py
