@@ -37,7 +37,7 @@ class ParticleFilterAgent(CaptureAgent):
         self.enemySuicideDetector = enemySuicideDetector
 
 
-        if EnemyPositionParticleFilter._LOGGING:        
+        if LOGGING_ENABLED:        
             self.estimated_distances_logger = logging.getLogger(f'estimated distances {self.index}')
             self.estimated_distances_logger.addHandler(DeferredFileHandler(f'estimated_distances_agent_{self.index}'))
             self.estimated_distances_logger.setLevel(logging.DEBUG)
@@ -51,7 +51,7 @@ class ParticleFilterAgent(CaptureAgent):
             self.noisy_distances_logger.setLevel(logging.DEBUG)
 
     def writeLogFiles(self):
-        if EnemyPositionParticleFilter._LOGGING:
+        if LOGGING_ENABLED:
             for handler in [*self.estimated_distances_logger.handlers, *self.true_distances_logger.handlers, *self.noisy_distances_logger.handlers]:
                 if type(handler) is DeferredFileHandler:
                     handler.flush()
@@ -119,7 +119,7 @@ class ParticleFilterAgent(CaptureAgent):
 
 
         # LOGGING
-        if EnemyPositionParticleFilter._LOGGING:
+        if LOGGING_ENABLED:
             estimated_pos = self.get_distinct_enemy_position_estimates()
             DEBUG_actual_enemy_positions = game_state.DEBUG_actual_enemy_positions
             self.estimated_distances_logger.info(self.get_distinct_enemy_distance_estimates())

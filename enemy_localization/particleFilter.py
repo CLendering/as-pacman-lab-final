@@ -1,5 +1,5 @@
 import numpy as np
-from enemy_localization.customLogging import logging, console_log_handler, DeferredFileHandler
+from enemy_localization.customLogging import logging, console_log_handler, DeferredFileHandler, LOGGING_ENABLED
 from collections import deque
 from contest.capture import SONAR_NOISE_VALUES, SIGHT_RANGE
 from contest.game import Directions, Configuration, Actions
@@ -8,7 +8,6 @@ from contest.game import Directions, Configuration, Actions
 _MAX_NOISE = max(SONAR_NOISE_VALUES)
 
 class EnemyPositionParticleFilter:
-    _LOGGING = False
     def __init__(self, num_particles, noisy_position_distribution_buffer_length, walls, initial_position, tracked_enemy_index):
         # Possible directions
         self.possible_directions = np.array([[-1, 0], [0, -1], [1, 0], [0, 1], [0, 0]])
@@ -131,7 +130,7 @@ class EnemyPositionParticleFilter:
         self.enemy_border_mask = np.full((walls.width, walls.height), False, dtype=bool)
         self.enemy_border_mask[enemy_side_border_column, :] = True
 
-        if EnemyPositionParticleFilter._LOGGING:
+        if LOGGING_ENABLED:
             self.logger = logging.getLogger(f'EPPF (enemy {tracked_enemy_index})')
             self.logger.setLevel(logging.WARNING)
             self.logger.addHandler(console_log_handler)
@@ -145,7 +144,7 @@ class EnemyPositionParticleFilter:
 
     
     def writeLogFiles(self):
-        if EnemyPositionParticleFilter._LOGGING:
+        if LOGGING_ENABLED:
             for handler in [*self.estimated_positions_logger.handlers, *self.true_positions_logger.handlers]:
                 if type(handler) is DeferredFileHandler:
                     handler.flush()
