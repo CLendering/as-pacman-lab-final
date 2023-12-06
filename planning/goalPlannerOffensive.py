@@ -9,6 +9,8 @@ class GoalPlannerOffensive(GoalPlanner):
     SAFETY_MARGIN = 3 # Distance to maintain from the closest ghost
     FOOD_FRAC_TO_RETREAT = 2 # Fraction of food remaining to retreat
     MAX_OFFENSE_DISTANCE = 2 # Max distance to an opponent ghost to be considered in offensive mode
+    POWER_PELLET_DISTANCE_MODIFIER = 2 # Modifier to determine if the agent should go for a power pellet instead of food
+    POWER_PELLET_MIN_DISTANCE_FOR_EVAL = 4 # Min distance to a power pellet to be considered for evaluation against food
 
     @staticmethod
     def compute_goal(agent, game_state):
@@ -26,18 +28,36 @@ class GoalPlannerOffensive(GoalPlanner):
         if GoalPlannerOffensive._is_time_to_retreat(agent, game_state):
             return GoalPlannerOffensive._determine_retreat_goal(agent, game_state, agent_is_pacman, center_of_our_side, agent_pos)
 
+        # Ghost positions that will be useful for the next steps
+        # Get opponent team members index and positions
+        opponent_team_members = agent.get_opponents(game_state)
+        opponent_ghosts_positions = {
+            opponent: game_state.get_agent_position(opponent)
+            for opponent in opponent_team_members if not game_state.get_agent_state(opponent).is_pacman
+        }
+
+        # Get the list of food
+        food_list = game_state.get_blue_food().as_list() if agent.red else game_state.get_red_food().as_list()
+
+        if food_list:
+            closest_food_pos = min(food_list, key=lambda food: agent.get_maze_distance(agent_pos, food))
+            distance_to_closest_food = agent.get_maze_distance(agent_pos, closest_food_pos)
+        else:
+            closest_food_pos = None
+            distance_to_closest_food = float('inf')
+
         # Power pellet planning
-        goal_for_power_pellet = GoalPlannerOffensive._plan_for_power_pellet(agent, game_state, agent_pos)
+        goal_for_power_pellet = GoalPlannerOffensive._plan_for_power_pellet(agent, game_state, agent_pos, opponent_ghosts_positions, opponent_team_members, distance_to_closest_food)
         if goal_for_power_pellet:
             return goal_for_power_pellet
 
         # Plan for avoiding ghosts
-        goal_for_avoiding_ghosts = GoalPlannerOffensive._plan_for_avoiding_ghosts(agent, game_state, agent_is_pacman, x_distance_to_center, agent_pos)
+        goal_for_avoiding_ghosts = GoalPlannerOffensive._plan_for_avoiding_ghosts(agent, game_state, agent_is_pacman, x_distance_to_center, agent_pos, opponent_ghosts_positions)
         if goal_for_avoiding_ghosts:
             return goal_for_avoiding_ghosts
 
         # Default goal: go for food or return to center
-        return GoalPlannerOffensive._default_goal(agent, game_state, agent_pos, center_of_our_side)
+        return GoalPlannerOffensive._default_goal(center_of_our_side, closest_food_pos)
 
     @staticmethod
     def _calculate_center_of_our_side(agent, game_state):
@@ -162,7 +182,20 @@ class GoalPlannerOffensive(GoalPlanner):
 
     
     @staticmethod
-    def _plan_for_power_pellet(agent, game_state, agent_pos):
+    def _plan_for_power_pellet(agent, game_state, agent_pos, opponent_ghosts_positions, opponent_team_members, distance_to_closest_food):
+        
+        # Get state of opponent ghosts
+        opponent_ghosts_states = {
+            opponent: game_state.get_agent_state(opponent)
+            for opponent in opponent_team_members if not game_state.get_agent_state(opponent).is_pacman
+        }
+
+        all_ghosts_scared = all(ghost.scared_timer > 0 for ghost in opponent_ghosts_states.values())
+
+        # Check if all opponent ghosts are scared, and if so, don't go for the power pellet
+        if all_ghosts_scared:
+            return None
+        
         # Get the list of power pellets
         power_pellets = game_state.get_blue_capsules() if agent.red else game_state.get_red_capsules()
         if not power_pellets:
@@ -172,12 +205,13 @@ class GoalPlannerOffensive(GoalPlanner):
         closest_power_pellet = min(power_pellets, key=lambda pellet: agent.get_maze_distance(agent_pos, pellet))
         agent_distance_to_pellet = agent.get_maze_distance(agent_pos, closest_power_pellet)
 
-        # Get opponent ghosts' positions
-        opponent_team_members = agent.get_opponents(game_state)
-        opponent_ghosts_positions = [game_state.get_agent_position(opponent) for opponent in opponent_team_members if not game_state.get_agent_state(opponent).is_pacman]
-
+        # If the distance to the closest power pellet is greater than a modifier of the distance to the closest food, don't go for the power pellet
+        if agent_distance_to_pellet > GoalPlannerOffensive.POWER_PELLET_MIN_DISTANCE_FOR_EVAL:
+            if agent_distance_to_pellet > distance_to_closest_food * GoalPlannerOffensive.POWER_PELLET_DISTANCE_MODIFIER:
+                return None
+        
         # Check if any ghost is closer to the power pellet than the agent
-        for ghost_pos in opponent_ghosts_positions:
+        for ghost_pos in opponent_ghosts_positions.values():
             if ghost_pos and agent.get_maze_distance(ghost_pos, closest_power_pellet) < agent_distance_to_pellet:
                 return None  # Another ghost is closer, abort going for the pellet
 
@@ -185,17 +219,10 @@ class GoalPlannerOffensive(GoalPlanner):
         return closest_power_pellet
     
     @staticmethod
-    def _plan_for_avoiding_ghosts(agent, game_state, agent_is_pacman, x_distance_to_center, agent_pos):
+    def _plan_for_avoiding_ghosts(agent, game_state, agent_is_pacman, x_distance_to_center, agent_pos, opponent_ghosts_positions):
         # Constants
         MAX_SAFE_DISTANCE = GoalPlannerOffensive.MAX_SAFE_DISTANCE
         BUFFER_ZONE_FROM_CENTER = GoalPlannerOffensive.BUFFER_ZONE_FROM_CENTER
-
-        # Get opponent team members index and positions
-        opponent_team_members = agent.get_opponents(game_state)
-        opponent_ghosts_positions = {
-            opponent: game_state.get_agent_position(opponent)
-            for opponent in opponent_team_members if not game_state.get_agent_state(opponent).is_pacman
-        }
 
         # Filter to get only the opponent ghosts that are not scared
         opponent_ghosts_positions = {opp: pos for opp, pos in opponent_ghosts_positions.items() if pos and game_state.get_agent_state(opp).scared_timer == 0}
@@ -287,13 +314,8 @@ class GoalPlannerOffensive(GoalPlanner):
 
     
     @staticmethod
-    def _default_goal(agent, game_state, agent_pos, center_of_our_side):
-        # Check if there's any food left to eat
-        food_list = game_state.get_blue_food().as_list() if agent.red else game_state.get_red_food().as_list()
-
-        if food_list:
-            # Find the closest food position
-            closest_food_pos = min(food_list, key=lambda food: agent.get_maze_distance(agent_pos, food))
+    def _default_goal(center_of_our_side, closest_food_pos):
+        if closest_food_pos:
             return closest_food_pos
         else:
             # If no food is left, or as a fallback, return to the center of our side
