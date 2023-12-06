@@ -75,10 +75,29 @@
             ]
         },
         {
-            "name": "Optimizer",
+            "name": "Optimizer Offensive",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/pacman-contest/src/contest/optimizer.py",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/optimizer_def.py",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "args": [
+                "-r",
+                "${workspaceFolder}/myTeam",
+                "-b",
+                "customTeam",
+                "--layout",
+                "RANDOM",
+                "--delay-step",
+                "0"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
+        {
+            "name": "Optimizer Defensive",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/optimizer_off.py",
             "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "args": [
                 "-r",

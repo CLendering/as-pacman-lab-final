@@ -1109,24 +1109,28 @@ def read_command(argv, grid_search):
     # LOAD OPTIMIZER PARAMETERS FOR OFFENSIVE A* AGENT
     hyperparameters = grid_search
 
-    red_agents[1].OPPONENT_GHOST_WEIGHT = hyperparameters["OPPONENT_GHOST_WEIGHT"]
-    red_agents[1].OPPONENT_GHOST_WEIGHT_ATTENUATION = hyperparameters[
+    red_agents[0].OPPONENT_GHOST_WEIGHT = hyperparameters["OPPONENT_GHOST_WEIGHT"]
+    red_agents[0].OPPONENT_GHOST_WEIGHT_ATTENUATION = hyperparameters[
         "OPPONENT_GHOST_WEIGHT_ATTENUATION"
     ]
-    red_agents[1].OPPONENT_PACMAN_WEIGHT = hyperparameters["OPPONENT_PACMAN_WEIGHT"]
-    red_agents[1].OPPONENT_PACMAN_WEIGHT_ATTENUATION = hyperparameters[
+    red_agents[0].OPPONENT_PACMAN_WEIGHT = hyperparameters["OPPONENT_PACMAN_WEIGHT"]
+    red_agents[0].OPPONENT_PACMAN_WEIGHT_ATTENUATION = hyperparameters[
         "OPPONENT_PACMAN_WEIGHT_ATTENUATION"
     ]
-    red_agents[1].ALLY_GHOST_WEIGHT = hyperparameters["ALLY_GHOST_WEIGHT"]
-    red_agents[1].ALLY_GHOST_WEIGHT_ATTENUATION = hyperparameters[
-        "ALLY_GHOST_WEIGHT_ATTENUATION"
+    red_agents[0].POWER_PELLET_WEIGHT = hyperparameters["POWER_PELLET_WEIGHT"]
+    red_agents[0].POWER_PELLET_WEIGHT_ATTENUATION = hyperparameters[
+        "POWER_PELLET_WEIGHT_ATTENUATION"
     ]
-    red_agents[1].ALLY_PACMAN_WEIGHT = hyperparameters["ALLY_PACMAN_WEIGHT"]
-    red_agents[1].ALLY_PACMAN_WEIGHT_ATTENUATION = hyperparameters[
-        "ALLY_PACMAN_WEIGHT_ATTENUATION"
+    red_agents[0].SCARED_GHOST_REWARD = hyperparameters["SCARED_GHOST_REWARD"]
+    red_agents[0].SCARED_GHOST_DISTANCE_ATTENUATION = hyperparameters[
+        "SCARED_GHOST_DISTANCE_ATTENUATION"
+    ]
+    red_agents[0].GHOST_COLLISION_PENALTY = hyperparameters["GHOST_COLLISION_PENALTY"]
+    red_agents[0].GHOST_COLLISION_DISTANCE_ATTENUATION = hyperparameters[
+        "GHOST_COLLISION_DISTANCE_ATTENUATION"
     ]
 
-    red_agents[1].EPSILON = hyperparameters["EPSILON"]
+    red_agents[0].EPSILON = hyperparameters["EPSILON"]
 
 
     print(f"\nBlue team {parsed_options.blue} with {blue_args}:")
@@ -1517,14 +1521,16 @@ def run(args):
 # Custom optimizer for agent parameters
 def run_optimizer(args):
     # Grid Search for Offensive A* Agent
-    OPPONENT_GHOST_WEIGHT = [0.5, 1, 2, 4, 8, 20]
+    OPPONENT_GHOST_WEIGHT = [0.1, 0.5, 1, 2, 4, 8, 20]
     OPPONENT_GHOST_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    OPPONENT_PACMAN_WEIGHT = [0.5, 1, 2, 4, 8, 20]
+    OPPONENT_PACMAN_WEIGHT = [0.1, 0.5, 1, 2, 4, 8, 20]
     OPPONENT_PACMAN_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    ALLY_GHOST_WEIGHT = [0.5, 1, 2, 4, 8, 20]
-    ALLY_GHOST_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
-    ALLY_PACMAN_WEIGHT = [0.5, 1, 2, 4, 8, 20]
-    ALLY_PACMAN_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+    POWER_PELLET_WEIGHT = [0.1, 0.5, 1, 2, 4, 8, 20]
+    POWER_PELLET_WEIGHT_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+    SCARED_GHOST_REWARD = [0.1, 0.5, 1, 2, 4, 8, 20]
+    SCARED_GHOST_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
+    GHOST_COLLISION_PENALTY = [0.1, 0.5, 1, 2, 4, 8, 20]
+    GHOST_COLLISION_DISTANCE_ATTENUATION = [0.3, 0.5, 0.7, 0.9, 1, 2]
 
     EPSILON = [0.2]
 
@@ -1533,15 +1539,17 @@ def run_optimizer(args):
         "OPPONENT_GHOST_WEIGHT_ATTENUATION": 0,
         "OPPONENT_PACMAN_WEIGHT": 0,
         "OPPONENT_PACMAN_WEIGHT_ATTENUATION": 0,
-        "ALLY_GHOST_WEIGHT": 0,
-        "ALLY_GHOST_WEIGHT_ATTENUATION": 0,
-        "ALLY_PACMAN_WEIGHT": 0,
-        "ALLY_PACMAN_WEIGHT_ATTENUATION": 0,
+        "POWER_PELLET_WEIGHT": 0,
+        "POWER_PELLET_WEIGHT_ATTENUATION": 0,
+        "SCARED_GHOST_REWARD": 0,
+        "SCARED_GHOST_DISTANCE_ATTENUATION": 0,
+        "GHOST_COLLISION_PENALTY": 0,
+        "GHOST_COLLISION_DISTANCE_ATTENUATION": 0,
         "EPSILON": 0,
     }
 
     # Args for --super-quiet and num_games
-    args_append = ["--super-quiet", "--numGames", "15"]
+    args_append = ["--super-quiet", "--numGames", "20"]
     args.extend(args_append)
 
     # Dict to store grid search results
@@ -1556,10 +1564,12 @@ def run_optimizer(args):
         grid_search["OPPONENT_GHOST_WEIGHT_ATTENUATION"] = random.choice(OPPONENT_GHOST_WEIGHT_ATTENUATION)
         grid_search["OPPONENT_PACMAN_WEIGHT"] = random.choice(OPPONENT_PACMAN_WEIGHT)
         grid_search["OPPONENT_PACMAN_WEIGHT_ATTENUATION"] = random.choice(OPPONENT_PACMAN_WEIGHT_ATTENUATION)
-        grid_search["ALLY_GHOST_WEIGHT"] = random.choice(ALLY_GHOST_WEIGHT)
-        grid_search["ALLY_GHOST_WEIGHT_ATTENUATION"] = random.choice(ALLY_GHOST_WEIGHT_ATTENUATION)
-        grid_search["ALLY_PACMAN_WEIGHT"] = random.choice(ALLY_PACMAN_WEIGHT)
-        grid_search["ALLY_PACMAN_WEIGHT_ATTENUATION"] = random.choice(ALLY_PACMAN_WEIGHT_ATTENUATION)
+        grid_search["POWER_PELLET_WEIGHT"] = random.choice(POWER_PELLET_WEIGHT)
+        grid_search["POWER_PELLET_WEIGHT_ATTENUATION"] = random.choice(POWER_PELLET_WEIGHT_ATTENUATION)
+        grid_search["SCARED_GHOST_REWARD"] = random.choice(SCARED_GHOST_REWARD)
+        grid_search["SCARED_GHOST_DISTANCE_ATTENUATION"] = random.choice(SCARED_GHOST_DISTANCE_ATTENUATION)
+        grid_search["GHOST_COLLISION_PENALTY"] = random.choice(GHOST_COLLISION_PENALTY)
+        grid_search["GHOST_COLLISION_DISTANCE_ATTENUATION"] = random.choice(GHOST_COLLISION_DISTANCE_ATTENUATION)
         grid_search["EPSILON"] = random.choice(EPSILON)
 
         # Run game
