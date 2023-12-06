@@ -1068,8 +1068,8 @@ def read_command(argv):
         recorded = pickle.load(open(parsed_options.replay, "rb"), encoding="utf-8")
         recorded["display"] = args["display"]
         recorded["delay"] = parsed_options.delay_step
-        recorded["red_team_name"] = parsed_options.red
-        recorded["blue_team_name"] = parsed_options.blue
+        recorded["display"].redName = recorded["red_team_name"]
+        recorded["display"].blueName = recorded["blue_team_name"]
         recorded["wait_end"] = False
         replay_game(**recorded)
         sys.exit(0)

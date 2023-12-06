@@ -377,7 +377,8 @@ class PacmanGraphics:
             self.infoPane.updateghost_distances(newState.ghost_distances)
 
 
-        self.animateEnemyPositionParticleFilters(newState)
+        if any(pf is not None for pf in [getattr(self, "redEnemyPositionParticleFilters", None), getattr(self, "blueEnemyPositionParticleFilters", None)]):
+            self.animateEnemyPositionParticleFilters(newState)
 
     def animateEnemyPositionParticleFilters(self, newState):
         agent_who_just_moved = newState._agent_moved

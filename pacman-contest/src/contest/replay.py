@@ -14,7 +14,7 @@ import re
 
 # Settings
 REPLAYS_FOLDER = "replays"
-PYTHON_BIN = "python3.6"
+PYTHON_BIN = "python"
 
 # Constants
 DIR_SCRIPT = sys.path[0]
@@ -27,6 +27,9 @@ parser = argparse.ArgumentParser(
     "Replay a specific replay file: \n"
     "\n\n"
     "\t\t python replay.py -f replays/BBC_vs_It_depends_contest18Capture.replay --delay-step 0.5"
+    "\n\n"
+    "Set the the directory containing replays:"
+    "\t\t python replay.py -d path/to/replays"
     "\n\n"
     "List all replays available with their ids:"
     "\n\n"
@@ -45,6 +48,10 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
     "-f", "--file", dest="file", nargs="?", help="Replay file to replay"
+)
+
+parser.add_argument(
+    "-d", "--directory", dest="directory", nargs="?", help="Directory of replays"
 )
 parser.add_argument(
     "-t",
@@ -82,10 +89,13 @@ def generate_cmd(replay_path):
     return f'{PYTHON_BIN} {os.path.join(DIR_SCRIPT, "capture.py")} --red-name {red} --blue-name {blue} --replay {replay_path} --delay-step {args.delay_step}'
 
 
-def main():
+def main():    
     if args.file:
         os.system(generate_cmd(args.file))
         exit(0)
+
+    if args.directory:
+        REPLAYS_FOLDER = os.path.abspath(args.directory)
 
     if not os.path.exists(REPLAYS_FOLDER):
         print(

@@ -105,6 +105,19 @@
             ]
         },
         {
+            "name": "Replay",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/capture.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/pacman-contest/src/contest",
+            "justMyCode": true,
+            "args": [
+                "--replay", "${workspaceFolder}/replays/match_3390.replay",
+                "--red-name","Red","--blue-name","Blue"
+            ]
+        },
+        {
             "name": "Keyboard Agents (doesn't work bc of some bug)",
             "type": "python",
             "request": "launch",
