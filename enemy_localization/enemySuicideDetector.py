@@ -8,11 +8,16 @@ class EnemySuicideDetector():
     their particle filter to their spawn position.
     """
     def __init__(self):
-        self.initialized = False
+        self.__initial_game_state = None
 
-    def initialize(self, enemies, agents_on_team, team_spawn_positions):
-        if self.initialized:
-            print('ESD.initialize was called although it was already initialized before')
+    def initializedFor(self, game_state):
+        return self.__initial_game_state == game_state
+
+    def initialize(self, enemies, agents_on_team, team_spawn_positions, initial_game_state):
+        if self.initializedFor(initial_game_state):
+            print(f'ESD.initialize was called although it was already initialized before for the same game state {initial_game_state}.')
+
+        self.__initial_game_state = initial_game_state
         self.enemies = enemies
         self.agentsOnTeam = agents_on_team
         self.teamSpawnPositions = team_spawn_positions

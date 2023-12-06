@@ -8,13 +8,17 @@ from contest.game import Directions, Configuration, Actions
 _MAX_NOISE = max(SONAR_NOISE_VALUES)
 
 class EnemyPositionParticleFilter:
-    def __init__(self, num_particles, noisy_position_distribution_buffer_length, walls, initial_position, tracked_enemy_index):
+    def __init__(self, num_particles, noisy_position_distribution_buffer_length, initial_game_state, tracked_enemy_index):
+        self.__initial_game_state = initial_game_state
         # Possible directions
         self.possible_directions = np.array([[-1, 0], [0, -1], [1, 0], [0, 1], [0, 0]])
         # Mask which is False for all directions except the stop direction 
         self.stop_direction_index = np.where(np.all(self.possible_directions==[0,0], axis=1))[0][0]
         self.stop_direction_mask = np.full((1, 1, len(self.possible_directions)), False, dtype=bool)
         self.stop_direction_mask[:, :, self.stop_direction_index] = True
+
+        walls = initial_game_state.get_walls()
+        initial_position = initial_game_state.get_agent_position(tracked_enemy_index)
 
 
         # Distributions based on noisy measurements, not actual particle positions
@@ -142,6 +146,8 @@ class EnemyPositionParticleFilter:
             self.true_positions_logger.addHandler(DeferredFileHandler(f'true_positions_enemy_{tracked_enemy_index}'))
             self.true_positions_logger.setLevel(logging.DEBUG)
 
+    def initializedFor(self, game_state):
+        return self.__initial_game_state == game_state
     
     def writeLogFiles(self):
         if LOGGING_ENABLED:

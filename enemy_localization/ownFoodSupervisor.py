@@ -7,15 +7,20 @@ class OwnFoodSupervisor():
     Keeps track of the food and capsules that are eaten by our enemies to localize them.
     """
     def __init__(self):
-        self.initialized = False
+        self.__initial_game_state = None
         self.logger = logging.getLogger('OFS)')
         self.logger.setLevel(logging.DEBUG)
         self.logger.addHandler(console_log_handler)
+        
     
-    def initialize(self, initial_own_food, initial_own_capsules, total_agents):
-        if self.initialized:
-            self.logger.critical('OFS.initialize was called although it was already initialized before')
-        self.initialized = True
+    def initializedFor(self, game_state):
+        return self.__initial_game_state == game_state
+
+    def initialize(self, initial_own_food, initial_own_capsules, total_agents, initial_game_state):
+        if self.initializedFor(initial_game_state):
+            print(f'OFS.initialize was called although it was already initialized before for the same game state {initial_game_state}.')
+
+        self.__initial_game_state = initial_game_state
         self.lastOwnFood = np.array(initial_own_food.data) # initial_own_food is of type contest.Game.grid -> data property has list data
         self.lastOwnCapsules = set(initial_own_capsules) # initial_own_capsules is a list of tuples
         self.totalAgents = total_agents
@@ -44,7 +49,7 @@ class OwnFoodSupervisor():
                 self._localized_enemy_position = differenceCapsules[0]
                 self._localized_enemy_index = (agent_index - 1) % self.totalAgents
             else:
-                self.logger.critical('Wtf? last={self.lastOwnCapsules}, now={own_capsules}, d={differenceCapsules}')
+                self.logger.critical(f'Wtf? last={self.lastOwnCapsules}, now={own_capsules}, d={differenceCapsules}')
     
         # Update own food and capsules
         np.copyto(self.lastOwnFood, own_food)

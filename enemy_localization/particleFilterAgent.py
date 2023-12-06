@@ -63,23 +63,23 @@ class ParticleFilterAgent(CaptureAgent):
         self.enemies = self.get_opponents(game_state)
         self.totalAgents = len(game_state.teams)
 
-        # initialize enemy position particle filters
-        if not self.enemyPositionParticleFilters:
+        # initialize enemy position particle filters if not initialized yet or if we are in a new game
+        if not self.enemyPositionParticleFilters or any(not pf.initializedFor(game_state) for pf in self.enemyPositionParticleFilters.values()):
             for enemy in self.enemies:
                 self.enemyPositionParticleFilters[enemy] = EnemyPositionParticleFilter(
                                                num_particles=500, 
                                                noisy_position_distribution_buffer_length=10,
-                                               walls=game_state.get_walls(), 
-                                               initial_position=game_state.get_agent_position(enemy),
+                                               initial_game_state=game_state,
                                                tracked_enemy_index=enemy)
-        if not self.ownFoodSupervisor.initialized:
+                
+        if not self.ownFoodSupervisor.initializedFor(game_state):
             own_food = self.get_food_you_are_defending(game_state)
             own_capsules = self.get_capsules_you_are_defending(game_state)
-            self.ownFoodSupervisor.initialize(own_food, own_capsules, self.totalAgents)
+            self.ownFoodSupervisor.initialize(own_food, own_capsules, self.totalAgents, game_state)
 
-        if not self.enemySuicideDetector.initialized:
+        if not self.enemySuicideDetector.initializedFor(game_state):
             team_spawn_positions = {agentOnTeam: game_state.get_initial_agent_position(agentOnTeam) for agentOnTeam in self.agentsOnTeam}
-            self.enemySuicideDetector.initialize(self.enemies, self.agentsOnTeam, team_spawn_positions)
+            self.enemySuicideDetector.initialize(self.enemies, self.agentsOnTeam, team_spawn_positions, game_state)
 
     def update_particle_filter(self, game_state):
         """
