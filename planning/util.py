@@ -1,3 +1,4 @@
+from collections import deque
 from contest.game import Configuration, Actions
 
 def get_theoretical_legal_successors(position, game_state):
@@ -61,3 +62,63 @@ def is_legal_position(position, game_state):
     )
 
 
+def bfs_until_non_wall(start, game_state):
+    """
+    Perform a breadth-first search until a non-wall position is found.
+
+    :param start: Tuple (x, y) representing the start coordinate.
+    :return: List of tuples representing the path to the first non-wall position.
+    """
+
+    # Correct start if its coordinates are negative
+    if start[0] < 0:
+        start = (0, start[1])
+    if start[1] < 0:
+        start = (start[0], 0)
+
+    # Correct start if its coordinates are greater than the width or height of the board
+    if start[0] >= game_state.data.layout.width:
+        start = (game_state.data.layout.width - 1, start[1])
+    if start[1] >= game_state.data.layout.height:
+        start = (start[0], game_state.data.layout.height - 1)
+        
+    # Define movements: right, left, up, down
+    movements = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+    # Queue for BFS, initialized with the start position
+    queue = deque([start])
+
+    # Dictionary to keep track of visited nodes and their parents
+    visited = {start: None}
+
+    # Breadth-First Search
+    while queue:
+        current = queue.popleft()
+        
+        # check if current is in a valid position
+        if current[1] >= game_state.data.layout.height or current[0] >= game_state.data.layout.width:
+            continue
+
+        # Check if current is not negative in any coordinate
+        if current[0] < 0 or current[1] < 0:
+            continue
+
+        # Stop if the current position is not a wall
+        if not game_state.has_wall(current[0], current[1]):
+            path = []
+            while current:
+                path.append(current)
+                current = visited[current]
+            return path[::-1]  # Return reversed path
+
+        # Check each neighbor
+        for dx, dy in movements:
+            neighbor = (current[0] + dx, current[1] + dy)
+
+            # If the neighbor is not visited, add it to the queue and mark as visited
+            if neighbor not in visited:
+                queue.append(neighbor)
+                visited[neighbor] = current
+
+    # If a non-wall position is not reachable
+    return None

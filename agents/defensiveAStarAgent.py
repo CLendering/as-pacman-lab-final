@@ -3,7 +3,7 @@ import time
 
 from enemy_localization.particleFilterAgent import ParticleFilterAgent
 from planning.search import aStarSearch
-from planning.util import is_legal_position
+from planning.util import is_legal_position, bfs_until_non_wall
 from planning.goalPlannerDefensive import GoalPlannerDefensive
 
 class DefensiveAStarAgent(ParticleFilterAgent):
@@ -39,7 +39,10 @@ class DefensiveAStarAgent(ParticleFilterAgent):
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
         # Fix goal if it is not legal
         self._fix_goal_if_not_legal(game_state)
-        self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
+        try:
+            self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
+        except:
+            self.plan = ['Stop', 'Stop', 'Stop', 'Stop', 'Stop', 'Stop', 'Stop']
         self.opponents_indexes = self.get_opponents(game_state)
 
     # Implements A* and executes the plan
@@ -98,7 +101,7 @@ class DefensiveAStarAgent(ParticleFilterAgent):
         else:
             return random.choice(actions)
 
-    def defensive_heuristic(self, agent, goal, game_state, track_heuristics=True, enable_profiling=False):
+    def defensive_heuristic(self, agent, goal, game_state, pos, track_heuristics=True, enable_profiling=False):
         heuristic = 0
         profiling_dict = {}
         heuristic_effect_dict = {}
@@ -106,23 +109,51 @@ class DefensiveAStarAgent(ParticleFilterAgent):
         if enable_profiling:
             start_time = time.perf_counter()
 
-        agent_pos = game_state.get_agent_position(agent.index)
         agent_is_pacman = game_state.get_agent_state(agent.index).is_pacman
         opponent_team_members = agent.opponents_indexes
 
+        # Get the ally team members (the agent's team members that are not the agent)
+        ally_team_members = [member for member in agent.get_team(game_state) if member != agent.index]
+
         # Categorize allies and adjust heuristic
-        ally_ghost_distances, ally_pacman_distances = self._categorize_allies(game_state, opponent_team_members, profiling_dict if enable_profiling else None)
+        ally_ghost_distances, ally_pacman_distances = self._categorize_allies(game_state, ally_team_members, pos, profiling_dict if enable_profiling else None)
         heuristic += self._adjust_heuristic_for_allies(agent_is_pacman, ally_ghost_distances, ally_pacman_distances, heuristic_effect_dict if track_heuristics else None)
 
         # Categorize opponents and adjust heuristic
-        opponent_ghost_distances, opponent_pacman_distances = self._categorize_opponents(game_state, opponent_team_members, profiling_dict if enable_profiling else None)
+        opponent_ghost_distances, opponent_pacman_distances = self._categorize_opponents(game_state, opponent_team_members, pos, profiling_dict if enable_profiling else None)
         heuristic += self._adjust_heuristic_for_opponents(agent_is_pacman, opponent_ghost_distances, opponent_pacman_distances, heuristic_effect_dict if track_heuristics else None)
+
+        # Strongly penalize the heuristic if the agent is not on smart offensive mode and the position being evaluated is in the
+        # enemy's side of the board
+        if not self.smart_offensive_mode:
+            if self._is_in_enemy_side_of_board(agent, game_state, pos):
+                heuristic -= 1000
+                if heuristic_effect_dict is not None:
+                    heuristic_effect_dict['enemy_side_of_board'] = heuristic
 
         if enable_profiling:
             profiling_dict['total_time'] = time.perf_counter() - start_time
 
         return heuristic
     
+    # Helper function to check if the agent is in the enemy's side of the board
+    def _is_in_enemy_side_of_board(self, agent, game_state, pos):
+        # Get the center of the board
+        center_of_board = (
+            int(game_state.data.layout.width / 2),
+            int(game_state.data.layout.height / 2),
+        )
+
+        # If agent is red, check if its x coordinate is more than the center of the board
+        if agent.red and pos[0] > center_of_board[0]:
+            return True
+        # If agent is blue, check if its x coordinate is less than the center of the board
+        elif not agent.red and pos[0] < center_of_board[0]:
+            return True
+        else:
+            return False
+
+        
     # Helper function that fixes the goal if it is not legal
     def _fix_goal_if_not_legal(self, game_state):
         # If any of the coordinates of the goal is negative, set that coordinate to 0
@@ -143,13 +174,18 @@ class DefensiveAStarAgent(ParticleFilterAgent):
                 int(game_state.data.layout.height / 2),
             )
 
-    def _categorize_allies(self, game_state, ally_team_members, profiling_dict=None):
+            if is_legal_position(self.goal, game_state) == False:
+                self.goal = bfs_until_non_wall(
+                    self.goal, game_state
+                )[-1]
+
+    def _categorize_allies(self, game_state, ally_team_members, pos, profiling_dict=None):
         start_time = time.perf_counter() if profiling_dict is not None else None
 
         ally_ghost_distances = {}
         ally_pacman_distances = {}
         for member in ally_team_members:
-            distance = game_state.agent_distances[member]
+            distance = self.get_maze_distance(pos, game_state.get_agent_position(member))
             if game_state.get_agent_state(member).is_pacman:
                 ally_pacman_distances[member] = distance
             else:
@@ -236,16 +272,15 @@ class DefensiveAStarAgent(ParticleFilterAgent):
             return False
         
     # Helper function to categorize opponents into ghosts and pacmen
-    def _categorize_opponents(self, game_state, opponent_team_members, profiling_dict=None):
+    def _categorize_opponents(self, game_state, opponent_team_members, pos, profiling_dict=None):
         start_time = time.perf_counter() if profiling_dict is not None else None
 
         opponent_ghost_distances = {}
         opponent_pacman_distances = {}
-
         # If estimates are available, use the non-probabilistic estimates
-        if self.enemy_position_estimates is not None and self.enemy_distance_estimates is not None:
+        if self.enemy_position_estimates is not None :
             for member in opponent_team_members:
-                distance = self.enemy_distance_estimates[member]
+                distance = self.get_maze_distance(pos, self.enemy_position_estimates[member])
                 if self.enemy_position_estimates[member] is not None:
                     if game_state.get_agent_state(member).is_pacman:
                         opponent_pacman_distances[member] = distance
@@ -253,7 +288,7 @@ class DefensiveAStarAgent(ParticleFilterAgent):
                         opponent_ghost_distances[member] = distance
         else:
             for member in opponent_team_members:
-                distance = game_state.agent_distances[member]
+                distance = self.get_maze_distance(pos, game_state.get_agent_position(member))
                 if game_state.get_agent_state(member).is_pacman:
                     opponent_pacman_distances[member] = distance
                 else:

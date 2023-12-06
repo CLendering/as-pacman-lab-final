@@ -124,7 +124,7 @@ def aStarSearch(agent, goal, game_state, heuristic=dijk):
 
     # Calculate the heuristic value for the starting state
     # time_heuristic = time.perf_counter()
-    heuristic_val = heuristic(agent, goal, game_state)
+    heuristic_val = heuristic(agent, goal, game_state, agent_pos)
     # print("Heuristic time: ", time.perf_counter() - time_heuristic)
 
     # Push the starting state into the queue with its heuristic value and mark it as visited
@@ -161,7 +161,7 @@ def aStarSearch(agent, goal, game_state, heuristic=dijk):
 
             # Calculate the estimated total cost for the successor (path cost + heuristic)
             # time_heuristic = time.perf_counter()
-            total_cost =  WEIGHT * path_cost + heuristic(agent, goal, game_state)
+            total_cost =  WEIGHT * path_cost + heuristic(agent, goal, game_state, pos)
             # print("Heuristic time: ", time.perf_counter() - time_heuristic)
 
             # If the successor is already in the priority queue and has a higher estimated total cost

@@ -3,7 +3,7 @@ import time
 
 from enemy_localization.particleFilterAgent import ParticleFilterAgent
 from planning.search import aStarSearch
-from planning.util import is_legal_position, get_first_definite_position
+from planning.util import is_legal_position, get_first_definite_position, bfs_until_non_wall
 from planning.goalPlannerOffensive import GoalPlannerOffensive
 
 class OffensiveSwitchAStarAgent(ParticleFilterAgent):
@@ -36,7 +36,15 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
         # Fix goal if it is not legal
         self._fix_goal_if_not_legal(game_state)
-        self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
+        try:
+            self.plan = aStarSearch(
+                agent=self,
+                goal=self.goal,
+                game_state=game_state,
+                heuristic=self.offensive_heuristic,
+            )
+        except Exception as e:
+            self.plan = ['Stop', 'Stop', 'Stop', 'Stop', 'Stop', 'Stop', 'Stop']
         self.opponents_indexes = self.get_opponents(game_state)
 
 
@@ -97,7 +105,7 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
         else:
             return random.choice(actions)
         
-    def offensive_heuristic(self, agent, goal, game_state, track_heuristics=False, enable_profiling=False):
+    def offensive_heuristic(self, agent, goal, game_state, pos, track_heuristics=False, enable_profiling=False):
         heuristic = 0
         profiling_dict = {}
         heuristic_effect_dict = {}
@@ -105,25 +113,24 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
         if enable_profiling:
             start_time = time.perf_counter()
 
-        agent_pos = game_state.get_agent_position(agent.index)
         agent_is_pacman = game_state.get_agent_state(agent.index).is_pacman
         opponent_team_members = agent.get_opponents(game_state)
 
         # Categorize opponents and adjust heuristic
-        opponent_ghost_distances, opponent_pacman_distances = self._categorize_opponents(game_state, opponent_team_members, profiling_dict if enable_profiling else None)
+        opponent_ghost_distances, opponent_pacman_distances = self._categorize_opponents(game_state, opponent_team_members, pos, profiling_dict if enable_profiling else None)
         heuristic += self._adjust_heuristic_for_opponents(agent_is_pacman, opponent_ghost_distances, opponent_pacman_distances, heuristic_effect_dict if track_heuristics else None)
 
         # Power pellets
         power_pellet_list = self._get_power_pellet_list(agent, game_state, profiling_dict if enable_profiling else None)
-        heuristic += self._adjust_heuristic_for_power_pellets(agent_pos, power_pellet_list, heuristic_effect_dict if track_heuristics else None)
+        heuristic += self._adjust_heuristic_for_power_pellets(pos, power_pellet_list, heuristic_effect_dict if track_heuristics else None)
 
         # Scared ghosts
         scared_ghosts = self._get_scared_ghosts(opponent_team_members, game_state, profiling_dict if enable_profiling else None)
-        heuristic += self._adjust_heuristic_for_scared_ghosts(agent_pos, scared_ghosts, heuristic_effect_dict if track_heuristics else None)
+        heuristic += self._adjust_heuristic_for_scared_ghosts(pos, scared_ghosts, heuristic_effect_dict if track_heuristics else None)
 
         # Ghost collisions
         if not agent_is_pacman:
-            heuristic += self._adjust_heuristic_for_ghost_collisions(agent_pos, game_state, profiling_dict if enable_profiling else None)
+            heuristic += self._adjust_heuristic_for_ghost_collisions(pos, game_state, profiling_dict if enable_profiling else None)
 
         if enable_profiling:
             profiling_dict['total_time'] = time.perf_counter() - start_time
@@ -149,17 +156,19 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
                 int(game_state.data.layout.width / 2),
                 int(game_state.data.layout.height / 2),
             )
+            if is_legal_position(self.goal, game_state) == False:
+                self.goal = bfs_until_non_wall(self.goal, game_state)[-1]
 
     # Helper function to categorize opponents into ghosts and pacmen
-    def _categorize_opponents(self, game_state, opponent_team_members, profiling_dict=None):
+    def _categorize_opponents(self, game_state, opponent_team_members, pos, profiling_dict=None):
         start_time = time.perf_counter() if profiling_dict is not None else None
 
         opponent_ghost_distances = {}
         opponent_pacman_distances = {}
         # If estimates are available, use the non-probabilistic estimates
-        if self.enemy_position_estimates is not None and self.enemy_distance_estimates is not None:
+        if self.enemy_position_estimates is not None :
             for member in opponent_team_members:
-                distance = self.enemy_distance_estimates[member]
+                distance = self.get_maze_distance(pos, self.enemy_position_estimates[member])
                 if self.enemy_position_estimates[member] is not None:
                     if game_state.get_agent_state(member).is_pacman:
                         opponent_pacman_distances[member] = distance
@@ -167,7 +176,7 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
                         opponent_ghost_distances[member] = distance
         else:
             for member in opponent_team_members:
-                distance = game_state.agent_distances[member]
+                distance = self.get_maze_distance(pos, game_state.get_agent_position(member))
                 if game_state.get_agent_state(member).is_pacman:
                     opponent_pacman_distances[member] = distance
                 else:
