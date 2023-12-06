@@ -86,7 +86,7 @@
                 "-b",
                 "customTeam",
                 "--layout",
-                "defaultCapture",
+                "RANDOM",
                 "--delay-step",
                 "0"
             ],

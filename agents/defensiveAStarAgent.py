@@ -37,6 +37,8 @@ class DefensiveAStarAgent(ParticleFilterAgent):
     def register_initial_state(self, game_state):
         super().register_initial_state(game_state)
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
+        # Fix goal if it is not legal
+        self._fix_goal_if_not_legal(game_state)
         self.plan = aStarSearch(agent=self, goal=self.goal, game_state=game_state)
         self.opponents_indexes = self.get_opponents(game_state)
 
