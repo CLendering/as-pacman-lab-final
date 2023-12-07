@@ -57,7 +57,7 @@ class GoalPlannerOffensive(GoalPlanner):
             return goal_for_avoiding_ghosts
 
         # Default goal: go for food or return to center
-        return GoalPlannerOffensive._default_goal(center_of_our_side, closest_food_pos)
+        return GoalPlannerOffensive._default_goal(center_of_our_side, closest_food_pos, food_list, agent, agent_pos, game_state)
 
     @staticmethod
     def _calculate_center_of_our_side(agent, game_state):
@@ -161,6 +161,20 @@ class GoalPlannerOffensive(GoalPlanner):
             return GoalPlannerOffensive._calculate_center_of_our_side(agent, game_state)
 
         return food_centroid
+    
+    @staticmethod
+    def _check_goal_oscillation(agent, game_state, goal):
+        previous_goals = agent.previous_goals
+
+        # Check if the goal has been oscillating more than 4 times
+        count_goal_oscillation = 0
+        for i in range(len(previous_goals)-1):
+            if previous_goals[i] == goal and previous_goals[i+1] != goal:
+                count_goal_oscillation += 1
+        if count_goal_oscillation > 3:
+            return True
+        else:
+            return False
 
     @staticmethod
     def _calculate_food_centroid(game_state,food_list):
@@ -203,6 +217,25 @@ class GoalPlannerOffensive(GoalPlanner):
 
         # Find the closest power pellet
         closest_power_pellet = min(power_pellets, key=lambda pellet: agent.get_maze_distance(agent_pos, pellet))
+
+        # Check if the power pellet position has been oscillating as the goal for the agent more than 4 times (to avoid oscillation)
+        # It needs to count the non-consecutive appeareances of the power pellet as the goal with just one goal between each two appeareances
+        power_pellet_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_power_pellet)
+        if power_pellet_oscillation:
+            # If the power pellet position has been oscillating as the goal for the agent more than 4 times, don't go for the power pellet and
+            # go for the second power pellet if available, and if not available, go for the closest food
+            power_pellets_new = power_pellets.copy()
+            power_pellets_new.remove(closest_power_pellet)
+            if power_pellets_new:
+                closest_power_pellet = min(power_pellets_new, key=lambda pellet: agent.get_maze_distance(agent_pos, pellet))
+
+                # Check if the new power pellet position has been oscillating as the goal for the agent more than 4 times (to avoid oscillation)
+                power_pellet_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_power_pellet)
+                if power_pellet_oscillation:
+                    return None
+            else:
+                return None
+            
         agent_distance_to_pellet = agent.get_maze_distance(agent_pos, closest_power_pellet)
 
         # If the distance to the closest power pellet is greater than a modifier of the distance to the closest food, don't go for the power pellet
@@ -314,7 +347,39 @@ class GoalPlannerOffensive(GoalPlanner):
 
     
     @staticmethod
-    def _default_goal(center_of_our_side, closest_food_pos):
+    def _default_goal(center_of_our_side, closest_food_pos, food_list, agent, agent_pos, game_state):
+        # Check if closest_food_pos is oscillating as the goal for the agent more than 4 times (to avoid oscillation)
+        food_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_food_pos)
+        if food_oscillation:
+            # Find the second closest food
+            food_list_new = food_list.copy()
+            food_list_new.remove(closest_food_pos)
+            if food_list_new:
+                closest_food_pos = min(food_list_new, key=lambda food: agent.get_maze_distance(agent_pos, food))
+
+                # Check if the new food position has been oscillating as the goal for the agent more than 4 times (to avoid oscillation)
+                food_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_food_pos)
+                if food_oscillation:
+                    # Find the third closest food
+                    food_list_new = food_list_new.copy()
+                    food_list_new.remove(closest_food_pos)
+                    if food_list_new:
+                        closest_food_pos = min(food_list_new, key=lambda food: agent.get_maze_distance(agent_pos, food))
+
+                        # Check if the new food position has been oscillating as the goal for the agent more than 4 times (to avoid oscillation)
+                        food_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_food_pos)
+                        if food_oscillation:
+                            # If the food position has been oscillating as the goal for the agent more than 4 times, go back to the center
+                            return center_of_our_side
+                        else:
+                            return closest_food_pos
+                    else:
+                        # If there is no third closest food, go back to the center
+                        return center_of_our_side
+            else:
+                # If there is no second closest food, go back to the center
+                return center_of_our_side
+            
         if closest_food_pos:
             return closest_food_pos
         else:

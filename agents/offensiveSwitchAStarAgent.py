@@ -29,6 +29,7 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
         self.has_smart_defensive_offensive_capabilities = False
         self.defensive_roaming_goal = None
         self.opponents_indexes = None
+        self.previous_goals = []
 
 
     def register_initial_state(self, game_state):
@@ -36,6 +37,7 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
         self.goal = self.action_planner.compute_goal(agent=self, game_state=game_state)
         # Fix goal if it is not legal
         self._fix_goal_if_not_legal(game_state)
+        self.previous_goals = [self.goal]
         try:
             self.plan = aStarSearch(
                 agent=self,
@@ -74,6 +76,12 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
 
         # Fix goal if it is not legal
         self._fix_goal_if_not_legal(game_state)
+
+        self.previous_goals.append(self.goal)
+
+        # Limit the number of previous goals to 20
+        if len(self.previous_goals) > 20:
+            self.previous_goals.pop(0)
 
         self.plan = aStarSearch(
             agent=self,
