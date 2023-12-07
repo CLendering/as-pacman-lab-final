@@ -13,15 +13,15 @@ class OffensiveSwitchAStarAgent(ParticleFilterAgent):
         super().__init__(index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing)
         ## HYPERPARAMETERS ##
         self.OPPONENT_GHOST_WEIGHT = 8  # Cost for approaching an opponent ghost
-        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.3 # Attenuation factor for the cost based on distance to the opponent ghost
+        self.OPPONENT_GHOST_WEIGHT_ATTENUATION = 0.9 # Attenuation factor for the cost based on distance to the opponent ghost
         self.OPPONENT_PACMAN_WEIGHT = 2  # Reward for approaching an opponent pacman
-        self.OPPONENT_PACMAN_WEIGHT_ATTENUATION = 0.3  # Attenuation factor for the reward based on distance to the opponent pacman
-        self.POWER_PELLET_WEIGHT = 8  # Reward for approaching a power pellet
-        self.POWER_PELLET_WEIGHT_ATTENUATION = 2  # Attenuation factor for the reward based on distance to the power pellet
-        self.SCARED_GHOST_REWARD = 8  # Reward for approaching a scared ghost
-        self.SCARED_GHOST_DISTANCE_ATTENUATION = 1  # Attenuation factor for the reward based on distance to the scared ghost
-        self.GHOST_COLLISION_PENALTY = 10  # Penalty for states closer to a previously known ghost location
-        self.GHOST_COLLISION_DISTANCE_ATTENUATION = 2  # Attenuation factor for the penalty based on distance to the previously known ghost location
+        self.OPPONENT_PACMAN_WEIGHT_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the opponent pacman
+        self.POWER_PELLET_WEIGHT = 0.5  # Reward for approaching a power pellet
+        self.POWER_PELLET_WEIGHT_ATTENUATION = 1  # Attenuation factor for the reward based on distance to the power pellet
+        self.SCARED_GHOST_REWARD = 0.5  # Reward for approaching a scared ghost
+        self.SCARED_GHOST_DISTANCE_ATTENUATION = 0.5  # Attenuation factor for the reward based on distance to the scared ghost
+        self.GHOST_COLLISION_PENALTY = 0.1  # Penalty for states closer to a previously known ghost location
+        self.GHOST_COLLISION_DISTANCE_ATTENUATION = 1  # Attenuation factor for the penalty based on distance to the previously known ghost location
         self.EPSILON = 0.2  # Small value to avoid division by zero
         self.goal = None
         self.plan = None

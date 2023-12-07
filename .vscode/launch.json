@@ -78,7 +78,7 @@
             "name": "Optimizer Offensive",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/pacman-contest/src/contest/optimizer_def.py",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/optimizer_off.py",
             "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "args": [
                 "-r",
@@ -97,7 +97,7 @@
             "name": "Optimizer Defensive",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/pacman-contest/src/contest/optimizer_off.py",
+            "program": "${workspaceFolder}/pacman-contest/src/contest/optimizer_def.py",
             "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "args": [
                 "-r",
