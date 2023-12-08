@@ -109,18 +109,23 @@ def plot_distances_for_agent(agent_index, data, axs):
         axs[i].grid(True)
 
         # Calculating and displaying stats
-        mse_estimated = ((true_distances[f"True Distance to Enemy 1"] - estimated_distances[f"Estimated Distance to Enemy 1"])**2).mean()
-        mse_noisy = ((true_distances[f"True Distance to Enemy 1"] - noisy_distances[f"Noisy Distance to Enemy 1"])**2).mean()
-        var_estimated_error = (true_distances[f"True Distance to Enemy 1"] - estimated_distances[f"Estimated Distance to Enemy 1"]).var()
-        var_noisy_error = (true_distances[f"True Distance to Enemy 1"] - noisy_distances[f"Noisy Distance to Enemy 1"]).var()
+        mse_estimated = ((true_distances[f"True Distance to Enemy {enemy}"] - estimated_distances[f"Estimated Distance to Enemy {enemy}"])**2).mean()
+        mse_noisy = ((true_distances[f"True Distance to Enemy {enemy}"] - noisy_distances[f"Noisy Distance to Enemy {enemy}"])**2).mean()
+        mae_estimated = ((true_distances[f"True Distance to Enemy {enemy}"] - estimated_distances[f"Estimated Distance to Enemy {enemy}"]).abs()).mean()
+        mae_noisy = ((true_distances[f"True Distance to Enemy {enemy}"] - noisy_distances[f"Noisy Distance to Enemy {enemy}"]).abs()).mean()
 
-        stats_text = f"MSE (Estimated to True): {mse_estimated:.2f}\n" \
-                f"MSE (Noisy to True): {mse_noisy:.2f}\n" \
+        var_estimated_error = (true_distances[f"True Distance to Enemy {enemy}"] - estimated_distances[f"Estimated Distance to Enemy {enemy}"]).var()
+        var_noisy_error = (true_distances[f"True Distance to Enemy {enemy}"] - noisy_distances[f"Noisy Distance to Enemy {enemy}"]).var()
+
+        stats_text = f"L2 Error (Estimated to True): {mse_estimated:.2f}\n" \
+                f"L2 Error (Noisy to True): {mse_noisy:.2f}\n" \
+                f"L1 Error (Estimated to True): {mae_estimated:.2f}\n" \
+                f"L1 Error (Noisy to True): {mae_noisy:.2f}\n" \
                 f"Variance (Estimated to True): {var_estimated_error:.2f}\n" \
                 f"Variance (Noisy to True): {var_noisy_error:.2f}"
         
-        axs[i].text(0.2, 0.85, stats_text, horizontalalignment='center', verticalalignment='center', transform=axs[i].transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
-
+        axs[i].text(0.2, 0.75, stats_text, horizontalalignment='left', verticalalignment='center', transform=axs[i].transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
+        axs[i].axhline(5, color='grey', linestyle='--', alpha=0.5)
 
 def plot_distance_evaluations():
     data = load_data_from_directory()

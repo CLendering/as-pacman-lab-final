@@ -1,26 +1,9 @@
-# Pacman Agent
+# A* is born
 
-A template for coding a pacman agent.
+Our agents use a particle filter to make an accurate estimate of the enemies' positions and distances:
 
-## Setting up the environment
-1. Copy or clone the code from this framework to create your Pacman Agent, e.g., `git clone git@github.com:jsego/pacman-agent.git`
-2. Go into pacman-agent folder, `cd pacman-agent/`
-3. Run `git submodule update --init --remote` to pull the last pacman-contest
-4. Create a virtual environment, e.g., `python3.8 -m venv venv`
-5. Activate the virtual environment with `source venv/bin/activate`
-6. Go to the pacman-contest folder and install the requirements:
-    - `cd pacman-contest/`
-    - `pip install -r requirements.txt`
-    - `pip install -e .`
+![Particle Filter](enemy_localization/logs/particle_filter/01/distance_evaluations.png)
 
-## Coding a new agent
-In the root folder do the following:
-1. Create in `myTeam.py` a class with the name of your agent that inherits from `CaptureAgent`, e.g. `class ReflexCaptureAgent(CaptureAgent):`
-2. In the new class, override the `def choose_action(self, game_state):` function to return the best next action (check the given source code example).
-3. (Optional) Add any other functions to the class for reasoning / learning and improving your agents decision which could also use other code sources in the same folder.
+Furthermore, we have two different goal planners for our defensive and offensive agent. The goal planners use a finite state machine to determine which goal to set for each agent. And A*-Search with different heuristics decides which path to take to the set goal.
 
-To debug the agent you can run `capture.py` between the `baselineTeam` and your current agent:
-1. `cd pacman-contest/src/contest/`
-2. `python capture.py -r baselineTeam -b ../../../myTeam.py`
-
-
+The behavior of the goal planners can be adapted by setting different hyperparameters. We determined a good set of parameters by running lots of games against different enemies and optimizing with regards to the points our team achieved.
