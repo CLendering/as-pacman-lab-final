@@ -562,12 +562,8 @@ class GameStateData:
         self._eaten = [False for a in self.agent_states]
 
 
-try:
-    import boinc
 
-    _BOINC_ENABLED = True
-except:
-    _BOINC_ENABLED = False
+_BOINC_ENABLED = False
 
 
 class Game:
@@ -788,8 +784,8 @@ class Game:
             self.unmute()
 
             # Execute the action
-            if self.state.data.timeleft % 100 == 0:
-                print(f"Time left: {self.state.data.timeleft}")
+            #if self.state.data.timeleft % 100 == 0:
+            #    print(f"Time left: {self.state.data.timeleft}")
             self.move_history.append((agent_index, action))
             if self.catch_exceptions:
                 try:

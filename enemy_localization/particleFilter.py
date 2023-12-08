@@ -268,6 +268,8 @@ class EnemyPositionParticleFilter:
         for distribution in self.noisy_position_distributions:
             if distribution.sum() > 0:
                 distribution /= distribution.sum()
+            else:
+                print("RIP distribution")
  
 
     def __flatten_out_noisy_position_distributions(self):

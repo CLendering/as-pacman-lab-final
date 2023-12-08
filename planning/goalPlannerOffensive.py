@@ -1,32 +1,36 @@
 from planning.goalPlanner import GoalPlanner
-from planning.goalPlannerDefensive import GoalPlannerDefensive
 from planning.search import bfs_until_non_wall
 
 class GoalPlannerOffensive(GoalPlanner):
-    MAX_SAFE_DISTANCE = 8 # Max distance to an opponent ghost to be considered in safe mode
-    BUFFER_ZONE_FROM_CENTER = 4 # Distance from the center of the board to consider the agent in a safe zone
-    TIME_LIMIT_FACTOR = 2 # Factor to determine the time limit to return to the center
-    SAFETY_MARGIN = 3 # Distance to maintain from the closest ghost
-    FOOD_FRAC_TO_RETREAT = 2 # Fraction of food remaining to retreat
-    MAX_OFFENSE_DISTANCE = 2 # Max distance to an opponent ghost to be considered in offensive mode
-    POWER_PELLET_DISTANCE_MODIFIER = 2 # Modifier to determine if the agent should go for a power pellet instead of food
-    POWER_PELLET_MIN_DISTANCE_FOR_EVAL = 4 # Min distance to a power pellet to be considered for evaluation against food
+    def __init__(self, max_safe_distance=8, buffer_zone_from_center=4, time_limit_factor=2, safety_margin=3, food_frac_to_retreat=2, max_offense_distance=2, power_pellet_distance_modifier=2, power_pellet_min_distance_for_eval=4):
+        super().__init__()
+        self.MAX_SAFE_DISTANCE = max_safe_distance # Max distance to an opponent ghost to be considered in safe mode
+        self.BUFFER_ZONE_FROM_CENTER = buffer_zone_from_center # Distance from the center of the board to consider the agent in a safe zone
+        self.TIME_LIMIT_FACTOR = time_limit_factor # Factor to determine the time limit to return to the center
+        self.SAFETY_MARGIN = safety_margin # Distance to maintain from the closest ghost
+        self.FOOD_FRAC_TO_RETREAT = food_frac_to_retreat # Fraction of food remaining to retreat
+        self.MAX_OFFENSE_DISTANCE = max_offense_distance # Max distance to an opponent ghost to be considered in offensive mode
+        self.POWER_PELLET_DISTANCE_MODIFIER = power_pellet_distance_modifier # Modifier to determine if the agent should go for a power pellet instead of food
+        self.POWER_PELLET_MIN_DISTANCE_FOR_EVAL = power_pellet_min_distance_for_eval # Min distance to a power pellet to be considered for evaluation against food
+        self.defensive_planner = None
 
-    @staticmethod
-    def compute_goal(agent, game_state):
-        center_of_our_side = GoalPlannerOffensive._calculate_center_of_our_side(agent, game_state)
+    def initializeWithOtherPlanner(self, defensive_planner):
+        self.defensive_planner = defensive_planner
+
+    def compute_goal(self, agent, game_state):
+        center_of_our_side = self._calculate_center_of_our_side(agent, game_state)
         agent_pos = game_state.get_agent_position(agent.index)
         agent_is_pacman = game_state.get_agent_state(agent.index).is_pacman
         x_distance_to_center = abs(agent_pos[0] - game_state.data.layout.width // 2)
     
         # Check if time is close to running out and we are winning so the agent becomes defensive
-        if GoalPlannerOffensive._is_time_up_become_defensive(agent, game_state):
-            agent.action_planner = GoalPlannerDefensive
-            return GoalPlannerOffensive._defensive_roaming_mode(agent, game_state)
+        if self._is_time_up_become_defensive(agent, game_state):
+            agent.action_planner = self.defensive_planner
+            return self._defensive_roaming_mode(agent, game_state)
         
         # Check if it's time to retreat based on the game timer or if if pacman is carrying sufficient food to return to the center
-        if GoalPlannerOffensive._is_time_to_retreat(agent, game_state):
-            return GoalPlannerOffensive._determine_retreat_goal(agent, game_state, agent_is_pacman, center_of_our_side, agent_pos)
+        if self._is_time_to_retreat(agent, game_state):
+            return self._determine_retreat_goal(agent, game_state, agent_is_pacman, center_of_our_side, agent_pos)
 
         # Ghost positions that will be useful for the next steps
         # Get opponent team members index and positions
@@ -47,20 +51,19 @@ class GoalPlannerOffensive(GoalPlanner):
             distance_to_closest_food = float('inf')
 
         # Power pellet planning
-        goal_for_power_pellet = GoalPlannerOffensive._plan_for_power_pellet(agent, game_state, agent_pos, opponent_ghosts_positions, opponent_team_members, distance_to_closest_food)
+        goal_for_power_pellet = self._plan_for_power_pellet(agent, game_state, agent_pos, opponent_ghosts_positions, opponent_team_members, distance_to_closest_food)
         if goal_for_power_pellet:
             return goal_for_power_pellet
 
         # Plan for avoiding ghosts
-        goal_for_avoiding_ghosts = GoalPlannerOffensive._plan_for_avoiding_ghosts(agent, game_state, agent_is_pacman, x_distance_to_center, agent_pos, opponent_ghosts_positions)
+        goal_for_avoiding_ghosts = self._plan_for_avoiding_ghosts(agent, game_state, agent_is_pacman, x_distance_to_center, agent_pos, opponent_ghosts_positions)
         if goal_for_avoiding_ghosts:
             return goal_for_avoiding_ghosts
 
         # Default goal: go for food or return to center
-        return GoalPlannerOffensive._default_goal(center_of_our_side, closest_food_pos, food_list, agent, agent_pos, game_state)
+        return self._default_goal(center_of_our_side, closest_food_pos, food_list, agent, agent_pos, game_state)
 
-    @staticmethod
-    def _calculate_center_of_our_side(agent, game_state):
+    def _calculate_center_of_our_side(self, agent, game_state):
         # Calculate the center of our side
         width_factor = 1/4 if agent.red else 3/4
         height_factor = 1/4 if agent.red else 3/4
@@ -77,12 +80,11 @@ class GoalPlannerOffensive(GoalPlanner):
         return center_of_our_side
     
     # Helper that after a certain time limit, the agent will become a defensive agent, if we are winning
-    @staticmethod
-    def _is_time_up_become_defensive(agent, game_state):
+    def _is_time_up_become_defensive(self, agent, game_state):
 
         # Get current time left and calculate the time limit
         time_left = game_state.data.timeleft
-        limit_time_to_back_to_center = GoalPlannerOffensive.TIME_LIMIT_FACTOR * (game_state.data.layout.height + game_state.data.layout.width)
+        limit_time_to_back_to_center = self.TIME_LIMIT_FACTOR * (game_state.data.layout.height + game_state.data.layout.width)
         time_up = time_left < limit_time_to_back_to_center
 
         # Check if we are winning
@@ -92,22 +94,20 @@ class GoalPlannerOffensive(GoalPlanner):
 
         return time_up and score > 0
     
-    @staticmethod
-    def _is_time_to_retreat(agent, game_state):
+    def _is_time_to_retreat(self, agent, game_state):
         time_left = game_state.data.timeleft
-        limit_time_to_back_to_center = GoalPlannerOffensive.TIME_LIMIT_FACTOR * (game_state.data.layout.height + game_state.data.layout.width)
+        limit_time_to_back_to_center = self.TIME_LIMIT_FACTOR * (game_state.data.layout.height + game_state.data.layout.width)
         time_up = time_left < limit_time_to_back_to_center
         
         # Check if pacman is carrying sufficient food to return to the center
         # sufficient is defined as a fraction of the food remaining
         food_remaining = len(agent.get_food(game_state).as_list())
         num_carrying = game_state.get_agent_state(agent.index).num_carrying
-        food_sufficient = num_carrying >= food_remaining / GoalPlannerOffensive.FOOD_FRAC_TO_RETREAT
+        food_sufficient = num_carrying >= food_remaining / self.FOOD_FRAC_TO_RETREAT
         
         return time_up or food_sufficient
     
-    @staticmethod
-    def _determine_retreat_goal(agent, game_state, agent_is_pacman, center_of_our_side, agent_pos):
+    def _determine_retreat_goal(self, agent, game_state, agent_is_pacman, center_of_our_side, agent_pos):
         if agent_is_pacman:
             # Calculate a retreat point closer to our side of the board
             center_to_finish_game = (center_of_our_side[0], agent_pos[1])
@@ -116,23 +116,21 @@ class GoalPlannerOffensive(GoalPlanner):
             return center_to_finish_game
         else:
             # For non-pacman agents, go tinto defensive roaming mode
-            return GoalPlannerOffensive._defensive_roaming_mode(agent, game_state)
+            return self._defensive_roaming_mode(agent, game_state)
         
-    @staticmethod
-    def _defensive_roaming_mode(agent, game_state):
+    def _defensive_roaming_mode(self, agent, game_state):
         # First, check for nearby opponents
-        closest_opponent, closest_opponent_distance = GoalPlannerOffensive._find_closest_opponent(agent, game_state)
+        closest_opponent, closest_opponent_distance = self._find_closest_opponent(agent, game_state)
 
         # If an opponent is close enough, and on our side of the board, go for it
-        if closest_opponent and closest_opponent_distance < GoalPlannerOffensive.MAX_OFFENSE_DISTANCE and closest_opponent[0] < game_state.data.layout.width // 2- GoalPlannerOffensive.MAX_OFFENSE_DISTANCE:
+        if closest_opponent and closest_opponent_distance < self.MAX_OFFENSE_DISTANCE and closest_opponent[0] < game_state.data.layout.width // 2- self.MAX_OFFENSE_DISTANCE:
             return closest_opponent
         
         
         # Otherwise, patrol areas with a lot of your team's food
-        return GoalPlannerOffensive._patrol_food_rich_areas(agent, game_state)
+        return self._patrol_food_rich_areas(agent, game_state)
 
-    @staticmethod
-    def _find_closest_opponent(agent, game_state):
+    def _find_closest_opponent(self, agent, game_state):
         min_distance = float('inf')
         closest_opponent_position = None
 
@@ -146,24 +144,22 @@ class GoalPlannerOffensive(GoalPlanner):
 
         return closest_opponent_position, min_distance
 
-    @staticmethod
-    def _patrol_food_rich_areas(agent, game_state):
+    def _patrol_food_rich_areas(self, agent, game_state):
         # Define the areas where your team's food is concentrated
         food_list = game_state.get_red_food().as_list() if agent.red else game_state.get_blue_food().as_list()
 
         # Find the area with the highest concentration of food
-        food_centroid = GoalPlannerOffensive._calculate_food_centroid(game_state, food_list)
+        food_centroid = self._calculate_food_centroid(game_state, food_list)
         
         # if agent is already very close the food centroid move away from it
         agent_pos = game_state.get_agent_position(agent.index)
         if agent_pos and food_centroid and agent.get_maze_distance(agent_pos, food_centroid) < 2:
             # go back to the center
-            return GoalPlannerOffensive._calculate_center_of_our_side(agent, game_state)
+            return self._calculate_center_of_our_side(agent, game_state)
 
         return food_centroid
     
-    @staticmethod
-    def _check_goal_oscillation(agent, game_state, goal):
+    def _check_goal_oscillation(self, agent, game_state, goal):
         previous_goals = agent.previous_goals
 
         # Check if the goal has been oscillating more than 4 times
@@ -176,8 +172,7 @@ class GoalPlannerOffensive(GoalPlanner):
         else:
             return False
 
-    @staticmethod
-    def _calculate_food_centroid(game_state,food_list):
+    def _calculate_food_centroid(self, game_state,food_list):
         if not food_list:
             return None
 
@@ -195,8 +190,7 @@ class GoalPlannerOffensive(GoalPlanner):
         return centroid
 
     
-    @staticmethod
-    def _plan_for_power_pellet(agent, game_state, agent_pos, opponent_ghosts_positions, opponent_team_members, distance_to_closest_food):
+    def _plan_for_power_pellet(self, agent, game_state, agent_pos, opponent_ghosts_positions, opponent_team_members, distance_to_closest_food):
         
         # Get state of opponent ghosts
         opponent_ghosts_states = {
@@ -220,7 +214,7 @@ class GoalPlannerOffensive(GoalPlanner):
 
         # Check if the power pellet position has been oscillating as the goal for the agent more than 4 times (to avoid oscillation)
         # It needs to count the non-consecutive appeareances of the power pellet as the goal with just one goal between each two appeareances
-        power_pellet_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_power_pellet)
+        power_pellet_oscillation = self._check_goal_oscillation(agent, game_state, closest_power_pellet)
         if power_pellet_oscillation:
             # If the power pellet position has been oscillating as the goal for the agent more than 4 times, don't go for the power pellet and
             # go for the second power pellet if available, and if not available, go for the closest food
@@ -230,7 +224,7 @@ class GoalPlannerOffensive(GoalPlanner):
                 closest_power_pellet = min(power_pellets_new, key=lambda pellet: agent.get_maze_distance(agent_pos, pellet))
 
                 # Check if the new power pellet position has been oscillating as the goal for the agent more than 4 times (to avoid oscillation)
-                power_pellet_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_power_pellet)
+                power_pellet_oscillation = self._check_goal_oscillation(agent, game_state, closest_power_pellet)
                 if power_pellet_oscillation:
                     return None
             else:
@@ -239,8 +233,8 @@ class GoalPlannerOffensive(GoalPlanner):
         agent_distance_to_pellet = agent.get_maze_distance(agent_pos, closest_power_pellet)
 
         # If the distance to the closest power pellet is greater than a modifier of the distance to the closest food, don't go for the power pellet
-        if agent_distance_to_pellet > GoalPlannerOffensive.POWER_PELLET_MIN_DISTANCE_FOR_EVAL:
-            if agent_distance_to_pellet > distance_to_closest_food * GoalPlannerOffensive.POWER_PELLET_DISTANCE_MODIFIER:
+        if agent_distance_to_pellet > self.POWER_PELLET_MIN_DISTANCE_FOR_EVAL:
+            if agent_distance_to_pellet > distance_to_closest_food * self.POWER_PELLET_DISTANCE_MODIFIER:
                 return None
         
         # Check if any ghost is closer to the power pellet than the agent
@@ -252,10 +246,10 @@ class GoalPlannerOffensive(GoalPlanner):
         return closest_power_pellet
     
     @staticmethod
-    def _plan_for_avoiding_ghosts(agent, game_state, agent_is_pacman, x_distance_to_center, agent_pos, opponent_ghosts_positions):
+    def _plan_for_avoiding_ghosts(self, agent, game_state, agent_is_pacman, x_distance_to_center, agent_pos, opponent_ghosts_positions):
         # Constants
-        MAX_SAFE_DISTANCE = GoalPlannerOffensive.MAX_SAFE_DISTANCE
-        BUFFER_ZONE_FROM_CENTER = GoalPlannerOffensive.BUFFER_ZONE_FROM_CENTER
+        MAX_SAFE_DISTANCE = self.MAX_SAFE_DISTANCE
+        BUFFER_ZONE_FROM_CENTER = self.BUFFER_ZONE_FROM_CENTER
 
         # Filter to get only the opponent ghosts that are not scared
         opponent_ghosts_positions = {opp: pos for opp, pos in opponent_ghosts_positions.items() if pos and game_state.get_agent_state(opp).scared_timer == 0}
@@ -272,14 +266,13 @@ class GoalPlannerOffensive(GoalPlanner):
             if agent_is_pacman or (not agent_is_pacman and x_distance_to_center <= BUFFER_ZONE_FROM_CENTER):
                 # Calculate safe position to retreat
                 # This can be a predefined safe location or dynamically calculated
-                return GoalPlannerOffensive._calculate_safe_retreat(agent, game_state, closest_ghost_position)
+                return self._calculate_safe_retreat(agent, game_state, closest_ghost_position)
 
         return None
     
-    @staticmethod
-    def _calculate_safe_retreat(agent, game_state, closest_ghost_position):
+    def _calculate_safe_retreat(self, agent, game_state, closest_ghost_position):
         # Constants for calculations
-        SAFETY_MARGIN = GoalPlannerOffensive.SAFETY_MARGIN  # distance to maintain from the closest ghost
+        SAFETY_MARGIN = self.SAFETY_MARGIN  # distance to maintain from the closest ghost
 
         agent_pos = game_state.get_agent_position(agent.index)
 
@@ -299,7 +292,7 @@ class GoalPlannerOffensive(GoalPlanner):
             retreat_options.append((teammate_pos, 'teammate'))
 
         # 3. Consider moving towards the home area
-        home_x, _ = GoalPlannerOffensive._calculate_center_of_our_side(agent, game_state)
+        home_x, _ = self._calculate_center_of_our_side(agent, game_state)
         home_area_positions = [(home_x, y) for y in range(game_state.data.layout.height)]
         for pos in home_area_positions:
             if not game_state.has_wall(*pos):
@@ -331,11 +324,10 @@ class GoalPlannerOffensive(GoalPlanner):
             int(agent_pos[1] + direction_away_from_ghost[1] * SAFETY_MARGIN),
         )
 
-        return GoalPlannerOffensive._adjust_retreat_position(potential_retreat_pos, game_state)
+        return self._adjust_retreat_position(potential_retreat_pos, game_state)
 
     
-    @staticmethod
-    def _adjust_retreat_position(potential_retreat_pos, game_state):
+    def _adjust_retreat_position(self, potential_retreat_pos, game_state):
         # Ensure the indices are within the game layout bounds
         max_x, max_y = game_state.data.layout.width - 1, game_state.data.layout.height - 1
         x, y = min(max(0, potential_retreat_pos[0]), max_x), min(max(0, potential_retreat_pos[1]), max_y)
@@ -346,10 +338,9 @@ class GoalPlannerOffensive(GoalPlanner):
         return (x, y)
 
     
-    @staticmethod
-    def _default_goal(center_of_our_side, closest_food_pos, food_list, agent, agent_pos, game_state):
+    def _default_goal(self, center_of_our_side, closest_food_pos, food_list, agent, agent_pos, game_state):
         # Check if closest_food_pos is oscillating as the goal for the agent more than 4 times (to avoid oscillation)
-        food_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_food_pos)
+        food_oscillation = self._check_goal_oscillation(agent, game_state, closest_food_pos)
         if food_oscillation:
             # Find the second closest food
             food_list_new = food_list.copy()
@@ -358,7 +349,7 @@ class GoalPlannerOffensive(GoalPlanner):
                 closest_food_pos = min(food_list_new, key=lambda food: agent.get_maze_distance(agent_pos, food))
 
                 # Check if the new food position has been oscillating as the goal for the agent more than 4 times (to avoid oscillation)
-                food_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_food_pos)
+                food_oscillation = self._check_goal_oscillation(agent, game_state, closest_food_pos)
                 if food_oscillation:
                     # Find the third closest food
                     food_list_new = food_list_new.copy()
@@ -367,7 +358,7 @@ class GoalPlannerOffensive(GoalPlanner):
                         closest_food_pos = min(food_list_new, key=lambda food: agent.get_maze_distance(agent_pos, food))
 
                         # Check if the new food position has been oscillating as the goal for the agent more than 4 times (to avoid oscillation)
-                        food_oscillation = GoalPlannerOffensive._check_goal_oscillation(agent, game_state, closest_food_pos)
+                        food_oscillation = self._check_goal_oscillation(agent, game_state, closest_food_pos)
                         if food_oscillation:
                             # If the food position has been oscillating as the goal for the agent more than 4 times, go back to the center
                             return center_of_our_side

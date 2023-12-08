@@ -8,7 +8,7 @@ from planning.goalPlannerOffensive import GoalPlannerOffensive
 
 class OffensiveSwitchAStarAgent(ParticleFilterAgent):
     def __init__(
-        self, index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing=0.1, action_planner=GoalPlannerOffensive
+        self, index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing=0.1, action_planner=GoalPlannerOffensive()
     ):
         super().__init__(index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing)
         ## HYPERPARAMETERS ##

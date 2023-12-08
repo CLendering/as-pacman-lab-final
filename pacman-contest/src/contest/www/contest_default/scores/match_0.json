@@ -1,37 +1,37 @@
 {
     "games": [
         [
-            "Red",
-            "Blue",
-            "layouts\\defaultCapture.lay",
-            16,
-            "Red",
-            127.0,
+            "A* is born",
+            "Digital Dragons",
+            "defaultCapture.lay",
+            0,
+            null,
+            558.0,
             0
         ]
     ],
     "layouts": [
-        "layouts\\defaultCapture.lay"
+        "defaultCapture.lay"
     ],
     "max_steps": 1200,
     "teams_stats": {
-        "Blue": [
-            0.0,
-            0,
-            0,
+        "A* is born": [
+            33.333333333333336,
+            1,
             0,
             1,
+            0,
             0,
             0
         ],
-        "Red": [
-            100.0,
-            3,
+        "Digital Dragons": [
+            33.333333333333336,
+            1,
+            0,
             1,
             0,
             0,
-            0,
-            16
+            0
         ]
     }
 }

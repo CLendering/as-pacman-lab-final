@@ -145,9 +145,11 @@
             "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "args": [
                 "--numGamesPerEnemy",
-                "30",
+                "10",
                 "--setGeneratorSeed",
                 "foo",
+                "--optimize-off",
+                "--optimize-def",
                 // arguments after the -- will be passed directly to capture.py for each game
                 "--",
                 "--catch-exceptions",

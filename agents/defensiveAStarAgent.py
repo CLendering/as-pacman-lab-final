@@ -8,7 +8,7 @@ from planning.goalPlannerDefensive import GoalPlannerDefensive
 
 class DefensiveAStarAgent(ParticleFilterAgent):
     def __init__(
-        self, index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing=0.1, action_planner=GoalPlannerDefensive
+        self, index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing=0.1, action_planner=GoalPlannerDefensive()
     ):
         super().__init__(index, enemy_position_particle_filters, own_food_supervisor, enemy_suicide_detector, time_for_computing)
         self.goal = None
