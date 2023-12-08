@@ -421,8 +421,10 @@ class EnemyPositionParticleFilter:
         condensed_distribution = np.sum(np.array(self.noisy_position_distributions), axis=0).sum(axis=2)
 
         # normalize
-        condensed_distribution /= np.sum(self.noisy_position_distributions)
-        assert np.isclose(condensed_distribution.sum(), 1)
+        if condensed_distribution.sum() > 0:
+            condensed_distribution /= np.sum(self.noisy_position_distributions)
+        if not np.isclose(condensed_distribution.sum(), 1):
+            print(f'Condensed distribution does not sum to 1, but to {condensed_distribution.sum()}')
         return condensed_distribution
 
     def __weigh_particles(self, condensed_position_distribution):
