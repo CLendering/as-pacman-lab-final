@@ -462,11 +462,11 @@ class CaptureRules:
 
     @staticmethod
     def get_move_warning_time():
-        return 1  # One second per move
+        return 3  # One second per move
 
     @staticmethod
     def get_move_timeout():
-        return 3  # Three seconds results in instant forfeit
+        return 6  # Three seconds results in instant forfeit
 
     @staticmethod
     def get_max_time_warnings():
