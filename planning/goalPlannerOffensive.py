@@ -245,7 +245,6 @@ class GoalPlannerOffensive(GoalPlanner):
         # Return the closest power pellet as the new goal
         return closest_power_pellet
     
-    @staticmethod
     def _plan_for_avoiding_ghosts(self, agent, game_state, agent_is_pacman, x_distance_to_center, agent_pos, opponent_ghosts_positions):
         # Constants
         MAX_SAFE_DISTANCE = self.MAX_SAFE_DISTANCE
