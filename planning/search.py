@@ -97,7 +97,7 @@ def get_actions(goal_state, parents):
 
 
 # dijkstra's algorithm
-def dijk(agent, goal, game_state=None):
+def dijk(*args, **kwargs):
     return 0
 
 
