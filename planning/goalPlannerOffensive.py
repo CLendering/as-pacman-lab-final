@@ -3,14 +3,14 @@ from planning.goalPlannerDefensive import GoalPlannerDefensive
 from planning.search import bfs_until_non_wall
 
 class GoalPlannerOffensive(GoalPlanner):
-    MAX_SAFE_DISTANCE = 9 # Max distance to an opponent ghost to be considered in safe mode
-    BUFFER_ZONE_FROM_CENTER = 5 # Distance from the center of the board to consider the agent in a safe zone
-    TIME_LIMIT_FACTOR = 2 # Factor to determine the time limit to return to the center
-    SAFETY_MARGIN = 4 # Distance to maintain from the closest ghost
-    FOOD_FRAC_TO_RETREAT = 2.5 # Fraction of food remaining to retreat
-    MAX_OFFENSE_DISTANCE = 2 # Max distance to an opponent ghost to be considered in offensive mode
-    POWER_PELLET_DISTANCE_MODIFIER = 2 # Modifier to determine if the agent should go for a power pellet instead of food
-    POWER_PELLET_MIN_DISTANCE_FOR_EVAL = 4 # Min distance to a power pellet to be considered for evaluation against food
+    MAX_SAFE_DISTANCE = 8 # Max distance to an opponent ghost to be considered in safe mode
+    BUFFER_ZONE_FROM_CENTER = 4 # Distance from the center of the board to consider the agent in a safe zone
+    TIME_LIMIT_FACTOR = 2.5 # Factor to determine the time limit to return to the center
+    SAFETY_MARGIN = 3 # Distance to maintain from the closest ghost
+    FOOD_FRAC_TO_RETREAT = 2 # Fraction of food remaining to retreat
+    MAX_OFFENSE_DISTANCE = 1 # Max distance to an opponent ghost to be considered in offensive mode
+    POWER_PELLET_DISTANCE_MODIFIER = 2.5 # Modifier to determine if the agent should go for a power pellet instead of food
+    POWER_PELLET_MIN_DISTANCE_FOR_EVAL = 3 # Min distance to a power pellet to be considered for evaluation against food
 
     @staticmethod
     def compute_goal(agent, game_state):
