@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "OUIRules-",
+            "A* is born*",
+            "RANDOM14542470",
+            28,
+            "OUIRules-",
+            60.0,
+            9196
+        ]
+    ],
+    "layouts": [
+        "RANDOM14542470"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ],
+        "OUIRules-": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            28
+        ]
+    }
+}

@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "Mi primera chamba",
+            "A* is born*",
+            "RANDOM5009464",
+            11,
+            "A* is born*",
+            68.0,
+            9147
+        ]
+    ],
+    "layouts": [
+        "RANDOM5009464"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            11
+        ],
+        "Mi primera chamba": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ]
+    }
+}

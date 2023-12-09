@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "A* is born*",
+            "Obesdo",
+            "RANDOM61595629",
+            28,
+            "A* is born*",
+            59.0,
+            9181
+        ]
+    ],
+    "layouts": [
+        "RANDOM61595629"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            28
+        ],
+        "Obesdo": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ]
+    }
+}

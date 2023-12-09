@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "Tonys Meat Market",
+            "A* is born*",
+            "RANDOM11208659",
+            23,
+            "A* is born*",
+            71.0,
+            9178
+        ]
+    ],
+    "layouts": [
+        "RANDOM11208659"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            23
+        ],
+        "Tonys Meat Market": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ]
+    }
+}

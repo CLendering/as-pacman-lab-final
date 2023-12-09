@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "Digital Dragons*",
+            "A* is born*",
+            "RANDOM88278406",
+            2,
+            "A* is born*",
+            129.0,
+            9138
+        ]
+    ],
+    "layouts": [
+        "RANDOM88278406"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            2
+        ],
+        "Digital Dragons*": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ]
+    }
+}

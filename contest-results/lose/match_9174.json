@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "A* is born*",
+            "adrimaren",
+            "RANDOM53046907",
+            2,
+            "adrimaren",
+            77.0,
+            9174
+        ]
+    ],
+    "layouts": [
+        "RANDOM53046907"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ],
+        "adrimaren": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            2
+        ]
+    }
+}

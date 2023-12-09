@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "A* is born*",
+            "The Fault in Our Stars*",
+            "RANDOM35285286",
+            11,
+            "The Fault in Our Stars*",
+            86.0,
+            9152
+        ]
+    ],
+    "layouts": [
+        "RANDOM35285286"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ],
+        "The Fault in Our Stars*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            11
+        ]
+    }
+}

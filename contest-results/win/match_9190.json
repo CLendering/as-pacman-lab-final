@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "JFTeam",
+            "A* is born*",
+            "RANDOM62924124",
+            9,
+            "A* is born*",
+            66.0,
+            9190
+        ]
+    ],
+    "layouts": [
+        "RANDOM62924124"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            9
+        ],
+        "JFTeam": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ]
+    }
+}

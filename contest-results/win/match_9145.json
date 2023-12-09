@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "IsaacPacmanov",
+            "A* is born*",
+            "RANDOM15406002",
+            14,
+            "A* is born*",
+            68.0,
+            9145
+        ]
+    ],
+    "layouts": [
+        "RANDOM15406002"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            14
+        ],
+        "IsaacPacmanov": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ]
+    }
+}

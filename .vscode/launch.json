@@ -132,8 +132,12 @@
             "cwd": "${workspaceFolder}/pacman-contest/src/contest",
             "justMyCode": true,
             "args": [
-                "--replay", "${workspaceFolder}/replays/match_3390.replay",
-                "--red-name","Red","--blue-name","Blue"
+                "--replay",
+                "${workspaceFolder}/contest-results/lose/match_9197.replay",
+                "--red-name",
+                "Red",
+                "--blue-name",
+                "Blue"
             ]
         },
         {

@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "blinky-clyde",
+            "A* is born*",
+            "RANDOM50961303",
+            6,
+            "A* is born*",
+            71.0,
+            9155
+        ]
+    ],
+    "layouts": [
+        "RANDOM50961303"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            6
+        ],
+        "blinky-clyde": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ]
+    }
+}

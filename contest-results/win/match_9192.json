@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "teamAI_UPF9876",
+            "A* is born*",
+            "RANDOM41928928",
+            17,
+            "A* is born*",
+            65.0,
+            9192
+        ]
+    ],
+    "layouts": [
+        "RANDOM41928928"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            17
+        ],
+        "teamAI_UPF9876": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ]
+    }
+}

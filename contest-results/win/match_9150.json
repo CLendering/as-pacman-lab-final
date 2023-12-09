@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "APM-EMAI*",
+            "A* is born*",
+            "RANDOM77452",
+            7,
+            "A* is born*",
+            83.0,
+            9150
+        ]
+    ],
+    "layouts": [
+        "RANDOM77452"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            7
+        ],
+        "APM-EMAI*": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ]
+    }
+}
