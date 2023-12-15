@@ -14,7 +14,10 @@ def main():
     soup = BeautifulSoup(content, 'html.parser')
 
     # Define the team name
-    team_name = "A* is born*"
+    team_name = "A* is born"
+
+    #
+    enemy_team_name = "Starman"
 
     # Search for all rows in the table
     rows = soup.find_all('tr')
@@ -29,7 +32,7 @@ def main():
             return 'lose'
 
     # Base URL for file downloads
-    base_url = "https://pacman-contest.upf.edu/final_2023/"  # Replace with the actual base URL
+    base_url = "https://pacman-contest.upf.edu/final_revised_all_2023/"  # Replace with the actual base URL
 
     # Prepare to store the file URLs and their respective directories
     file_urls = []
@@ -37,10 +40,11 @@ def main():
     # Process each row
     for row in rows:
         columns = row.find_all('td')
-        if len(columns) >= 9:  # Ensure there are at least 9 columns
-            team1, team2, _, _, _, winner, *file_links = columns[:9]  # Extract first 9 columns
-            if team_name in [team1.get_text().strip(), team2.get_text().strip()]:
-                dir_name = determine_directory(team_name, winner.get_text().strip())
+        if len(columns) == 9:  # Ensure there are 9 columns
+            team1, team2, layout, _, _, winner, *file_links = columns[:9]  # Extract first 9 columns
+            teams = set([team1.get_text().strip().rstrip('*'), team2.get_text().strip().rstrip('*')])
+            if {team_name, enemy_team_name} == teams :
+                dir_name = determine_directory(team_name, winner.get_text().strip().rstrip('*'))
                 for link in file_links:
                     file_url = base_url + link.find('a')['href']
                     file_urls.append((file_url, dir_name))

@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Default Pacman Contest",
             "type": "python",
             "request": "launch",
@@ -133,7 +141,7 @@
             "justMyCode": true,
             "args": [
                 "--replay",
-                "${workspaceFolder}/contest-results/lose/match_9197.replay",
+                "${workspaceFolder}/contest-results/lose/match_15955.replay",
                 "--red-name",
                 "Red",
                 "--blue-name",
