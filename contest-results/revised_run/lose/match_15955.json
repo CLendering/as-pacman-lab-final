@@ -1,0 +1,37 @@
+{
+    "games": [
+        [
+            "A* is born*",
+            "Starman*",
+            "RANDOM4872517",
+            1,
+            "Starman*",
+            72.0,
+            15955
+        ]
+    ],
+    "layouts": [
+        "RANDOM4872517"
+    ],
+    "max_steps": 1200,
+    "teams_stats": {
+        "A* is born*": [
+            0.0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+        ],
+        "Starman*": [
+            100.0,
+            3,
+            1,
+            0,
+            0,
+            0,
+            1
+        ]
+    }
+}
